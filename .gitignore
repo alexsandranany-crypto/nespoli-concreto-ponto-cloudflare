@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.openai/
+.wrangler/
+.dev.vars
+*.tar.gz
+backup-*.json

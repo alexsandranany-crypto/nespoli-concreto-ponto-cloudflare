@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b2d">
+  <title>Nespoli Concreto • Ponto e Pagamentos</title>
+  <link rel="stylesheet" href="styles.css?v=18">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <img src="assets/logo-nespoli-concreto.png" alt="">
+      </div>
+      <div>
+        <p class="eyebrow">NESPOLI CONCRETO</p>
+        <h1>Ponto e pagamentos</h1>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="save-status syncing" id="saveStatus" type="button" disabled title="Conectando à nuvem"><span class="status-dot"></span> Conectando à nuvem…</button>
+      <button class="btn btn-ghost" id="backupBtn" type="button">Backup / Transferir</button>
+      <button class="btn btn-ghost" id="advancesBtn" type="button">Vales</button>
+      <button class="btn btn-primary" id="reportBtn" type="button">Preparar relatório</button>
+      <form action="/logout" method="post" class="logout-form"><button class="btn btn-ghost" type="submit">Sair</button></form>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="overview" aria-labelledby="overviewTitle">
+      <div class="section-heading overview-heading">
+        <div>
+            <p class="eyebrow accent">VISÃO DO PERÍODO</p>
+          <h2 id="overviewTitle">Resumo de pagamentos</h2>
+          <p id="periodLabel" class="muted">Todos os lançamentos</p>
+        </div>
+        <div class="quick-periods" aria-label="Atalhos de período">
+          <button class="chip" data-period="close7" type="button">Fechamento 07</button>
+          <button class="chip active" data-period="close20" type="button">Fechamento 20</button>
+          <button class="chip" data-period="month" type="button">Este mês</button>
+          <button class="chip" data-period="all" type="button">Todos</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <article class="stat-card">
+          <span>Colaboradores</span>
+          <strong id="statEmployees">0</strong>
+          <small id="statEntries">0 lançamentos</small>
+        </article>
+        <article class="stat-card">
+          <span>Horas trabalhadas</span>
+          <strong id="statHours">0h00</strong>
+          <small>Intervalos descontados</small>
+        </article>
+        <article class="stat-card">
+          <span>Total líquido</span>
+          <strong id="statTotal">R$ 0,00</strong>
+          <small id="statAdvances">Vales: R$ 0,00</small>
+        </article>
+        <article class="stat-card warning">
+          <span>Saldo não pago</span>
+          <strong id="statPending">R$ 0,00</strong>
+          <small id="statPaid">Pago: R$ 0,00</small>
+        </article>
+      </div>
+    </section>
+
+    <section class="workspace-grid">
+      <article class="panel entry-panel">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow accent" id="formMode">NOVO LANÇAMENTO</p>
+            <h2 id="entryFormTitle">Registrar jornada</h2>
+          </div>
+          <button class="btn btn-quiet" id="manageEmployeesBtn" type="button">Colaboradores</button>
+        </div>
+
+        <form id="entryForm" novalidate>
+          <input id="entryId" type="hidden">
+          <div class="field full">
+            <label for="employeeSelect">Colaborador</label>
+            <div class="inline-control">
+              <select id="employeeSelect" required>
+                <option value="">Cadastre um colaborador</option>
+              </select>
+              <button class="icon-btn" id="quickAddEmployeeBtn" type="button" aria-label="Adicionar colaborador">+</button>
+            </div>
+            <small id="rateHint">A forma de pagamento será guardada neste lançamento.</small>
+          </div>
+
+          <div class="field full">
+            <label for="workDate">Data</label>
+            <input id="workDate" type="date" required>
+          </div>
+
+          <div class="field full record-type-field">
+            <label for="recordType">O que aconteceu neste dia?</label>
+            <select id="recordType">
+              <option value="work">Trabalhou — registrar horários</option>
+              <option value="absence">Faltou — registrar falta</option>
+            </select>
+          </div>
+
+          <div class="absence-form-notice" id="absenceFormNotice" hidden>
+            <strong>Falta</strong>
+            <span>O colaborador ficará marcado como ausente nesta data, sem horas e sem valor calculado.</span>
+          </div>
+
+          <div class="time-grid" id="timeGrid">
+            <div class="field">
+              <label for="startTime">Entrada</label>
+              <input id="startTime" type="time" required>
+            </div>
+            <div class="field">
+              <label for="breakStart">Saída intervalo</label>
+              <input id="breakStart" type="time">
+            </div>
+            <div class="field">
+              <label for="breakEnd">Retorno</label>
+              <input id="breakEnd" type="time">
+            </div>
+            <div class="field">
+              <label for="endTime">Saída final</label>
+              <input id="endTime" type="time" required>
+            </div>
+          </div>
+
+          <div class="field full calculation-mode" id="calculationMode">
+            <label for="valueMode">Forma de calcular este lançamento</label>
+            <select id="valueMode">
+              <option value="worked">Pagar todas as horas trabalhadas</option>
+              <option value="balance8h">Valor integral já pago — lançar somente o saldo em relação a 8h</option>
+            </select>
+            <small>Se a jornada for menor que 8h, o saldo aparecerá negativo; se for maior, mostrará apenas as horas extras.</small>
+          </div>
+
+          <div class="calc-preview" id="calcPreview" aria-live="polite">
+            <div>
+              <span>Horas líquidas</span>
+              <strong id="previewHours">—</strong>
+            </div>
+            <div>
+              <span>Valor calculado</span>
+              <strong id="previewCalculated">—</strong>
+            </div>
+            <div class="preview-final">
+              <span>Valor a lançar</span>
+              <strong id="previewFinal">—</strong>
+            </div>
+          </div>
+          <p class="formula-note" id="formulaNote">O sistema usará a diária ou o salário mensal do colaborador.</p>
+
+          <details class="adjustment-box" id="adjustmentBox">
+            <summary>Ajustar o valor final manualmente</summary>
+            <div class="adjustment-grid">
+              <div class="field">
+                <label for="manualValue">Valor final deste lançamento</label>
+                <div class="currency-input"><span>R$</span><input id="manualValue" type="number" step="0.01" inputmode="decimal" placeholder="Ex.: -18,50 ou 28,13"></div>
+              </div>
+              <div class="field">
+                <label for="manualReason">Motivo do ajuste</label>
+                <input id="manualReason" type="text" maxlength="120" placeholder="Ex.: diária integral já paga">
+              </div>
+            </div>
+            <p class="help">Quando preenchido, este valor substitui o cálculo automático apenas neste lançamento.</p>
+          </details>
+
+          <div class="form-row">
+            <div class="field grow">
+              <label for="notes" id="notesLabel">Observação <span>(opcional)</span></label>
+              <input id="notes" type="text" maxlength="160" placeholder="Serviço, local ou lembrete">
+            </div>
+            <div class="field status-field" id="paymentStatusField">
+              <label for="paymentStatus">Pagamento</label>
+              <select id="paymentStatus">
+                <option value="pending">Não pago</option>
+                <option value="paid">Pago</option>
+              </select>
+            </div>
+            <div class="field payment-date-field" id="paymentDateField" hidden>
+              <label for="paymentDate">Data do pagamento</label>
+              <input id="paymentDate" type="date">
+            </div>
+          </div>
+
+          <div id="formError" class="form-error" role="alert" hidden></div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" id="cancelEditBtn" type="button" hidden>Cancelar edição</button>
+            <button class="btn btn-primary wide" id="saveEntryBtn" type="submit">Salvar lançamento</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="panel records-panel">
+        <div class="section-heading records-heading">
+          <div>
+            <p class="eyebrow accent">LANÇAMENTOS</p>
+            <h2>Jornadas e faltas por colaborador</h2>
+          </div>
+          <button class="btn btn-quiet mobile-filter-btn" id="toggleFiltersBtn" type="button">Filtros</button>
+        </div>
+
+        <div class="filters" id="filtersPanel">
+          <div class="field">
+            <label for="filterEmployee">Colaborador</label>
+            <select id="filterEmployee"><option value="all">Todos</option></select>
+          </div>
+          <div class="field">
+            <label for="filterStart">De</label>
+            <input id="filterStart" type="date">
+          </div>
+          <div class="field">
+            <label for="filterEnd">Até</label>
+            <input id="filterEnd" type="date">
+          </div>
+          <div class="field">
+            <label for="filterStatus">Status</label>
+            <select id="filterStatus">
+              <option value="all">Todos</option>
+              <option value="pending">Não pago</option>
+              <option value="paid">Pago</option>
+              <option value="absence">Falta</option>
+            </select>
+          </div>
+          <button class="btn btn-quiet clear-filter" id="clearFiltersBtn" type="button">Limpar</button>
+        </div>
+
+        <div id="absenceAlert" class="absence-alert" role="status" hidden>
+          <div class="absence-alert-icon" aria-hidden="true">!</div>
+          <div><strong>Faltas registradas no período</strong><p id="absenceAlertText"></p></div>
+        </div>
+        <div id="recordsList" class="records-list"></div>
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">+</div>
+          <h3>Nenhum registro neste período</h3>
+          <p>Cadastre um colaborador ou restaure um backup da Nespoli Concreto.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="employeesDialog" class="dialog employees-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">EQUIPE</p><h2>Colaboradores</h2></div>
+      <button class="close-btn" data-close="employeesDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <form id="employeeForm" class="employee-form">
+      <input id="employeeId" type="hidden">
+      <div class="field grow">
+        <label for="employeeName">Nome</label>
+        <input id="employeeName" type="text" maxlength="80" placeholder="Nome do colaborador" required>
+      </div>
+      <div class="field payment-type-field">
+        <label for="employeePaymentType">Pagamento</label>
+        <select id="employeePaymentType">
+          <option value="daily">Por diária</option>
+          <option value="monthly">Mensalista</option>
+        </select>
+      </div>
+      <div class="field rate-field" id="employeeRateField">
+        <label for="employeeRate">Diária</label>
+        <div class="currency-input"><span>R$</span><input id="employeeRate" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="150,00" required></div>
+      </div>
+      <div class="monthly-payment-fields" id="employeeMonthlyFields" hidden>
+        <div class="field">
+          <label for="employeeMonthlySalary">Salário mensal</label>
+          <div class="currency-input"><span>R$</span><input id="employeeMonthlySalary" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="2.200,00"></div>
+        </div>
+        <div class="field">
+          <label for="employeeMonthlyHours">Horas por mês</label>
+          <input id="employeeMonthlyHours" type="number" min="1" step="1" inputmode="numeric" value="220">
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit" id="saveEmployeeBtn">Adicionar</button>
+      <button class="btn btn-secondary" type="button" id="cancelEmployeeEditBtn" hidden>Cancelar</button>
+    </form>
+    <div id="employeeError" class="form-error" role="alert" hidden></div>
+    <div id="employeesList" class="employees-list"></div>
+  </dialog>
+
+  <dialog id="ratesDialog" class="dialog rates-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">HISTÓRICO DE DIÁRIAS</p><h2 id="ratesEmployeeName">Colaborador</h2></div>
+      <button class="close-btn" data-close="ratesDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <p class="dialog-copy">Cadastre cada mudança na data em que o novo valor começou. As jornadas já lançadas serão recalculadas automaticamente pela diária válida em cada data.</p>
+    <form id="rateForm" class="rate-form">
+      <input id="rateId" type="hidden">
+      <div class="field">
+        <label for="rateStartDate">Novo valor a partir de</label>
+        <input id="rateStartDate" type="date" required>
+      </div>
+      <div class="field">
+        <label for="rateValue">Valor da diária</label>
+        <div class="currency-input"><span>R$</span><input id="rateValue" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="150,00" required></div>
+      </div>
+      <button class="btn btn-primary" id="saveRateBtn" type="submit">Adicionar alteração</button>
+      <button class="btn btn-secondary" id="cancelRateEditBtn" type="button" hidden>Cancelar</button>
+    </form>
+    <div id="rateError" class="form-error rate-error" role="alert" hidden></div>
+    <div id="ratesList" class="rates-list"></div>
+  </dialog>
+
+  <dialog id="backupDialog" class="dialog backup-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">SEGURANÇA</p><h2>Backup dos dados</h2></div>
+      <button class="close-btn" data-close="backupDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <p class="dialog-copy">Os dados ficam salvos automaticamente neste aparelho e na nuvem privada, para uso no celular e no computador. Você também pode baixar uma cópia de segurança ou restaurar um backup antigo.</p>
+    <div class="backup-actions">
+      <button class="btn btn-primary" id="exportBackupBtn" type="button">Baixar arquivo do backup</button>
+      <button class="btn btn-primary" id="restoreBundledBackupBtn" type="button">Carregar backup incluído</button>
+      <button class="btn btn-secondary" id="copyBackupBtn" type="button">Copiar dados do backup</button>
+      <button class="btn btn-secondary" id="importBackupBtn" type="button">Restaurar por arquivo</button>
+      <input id="backupFile" type="file" accept="application/json,.json" hidden>
+    </div>
+    <div class="backup-text-transfer">
+      <label for="backupText">Transferir sem arquivo</label>
+      <p>Clique em “Copiar dados do backup” no aparelho antigo. No aparelho novo, cole os dados abaixo e clique em restaurar.</p>
+      <textarea id="backupText" rows="5" spellcheck="false" placeholder="Cole aqui os dados copiados do backup"></textarea>
+      <button class="btn btn-secondary" id="restoreBackupTextBtn" type="button">Restaurar dados colados</button>
+    </div>
+    <div class="backup-meta" id="backupMeta"></div>
+  </dialog>
+
+  <dialog id="advancesDialog" class="dialog advances-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">VALES E ADIANTAMENTOS</p><h2>Registrar desconto</h2></div>
+      <button class="close-btn" data-close="advancesDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <p class="dialog-copy">O vale será descontado do total do colaborador no período correspondente à data informada.</p>
+    <form id="advanceForm" class="advance-form">
+      <input id="advanceId" type="hidden">
+      <div class="field">
+        <label for="advanceEmployee">Colaborador</label>
+        <select id="advanceEmployee" required><option value="">Selecione</option></select>
+      </div>
+      <div class="field">
+        <label for="advanceDate">Data</label>
+        <input id="advanceDate" type="date" required>
+      </div>
+      <div class="field">
+        <label for="advanceValue">Valor do vale</label>
+        <div class="currency-input"><span>R$</span><input id="advanceValue" type="text" inputmode="decimal" autocomplete="off" placeholder="100,00" required aria-describedby="advanceValueHint"></div>
+        <small id="advanceValueHint" class="field-hint">Pode usar vírgula ou ponto. Ex.: 18,00</small>
+      </div>
+      <div class="field grow">
+        <label for="advanceNote">Observação</label>
+        <input id="advanceNote" type="text" maxlength="120" placeholder="Ex.: adiantamento em dinheiro">
+      </div>
+      <button class="btn btn-primary" id="saveAdvanceBtn" type="submit">Adicionar vale</button>
+      <button class="btn btn-secondary" id="cancelAdvanceEditBtn" type="button" hidden>Cancelar</button>
+    </form>
+    <div id="advanceError" class="form-error advance-error" role="alert" hidden></div>
+    <section class="advance-history" aria-labelledby="advanceHistoryTitle">
+      <div class="advance-history-heading">
+        <div>
+          <h3 id="advanceHistoryTitle">Consultar vales</h3>
+          <p>Escolha um colaborador e informe a data inicial e a data final do período.</p>
+        </div>
+        <div class="advance-filter-total" aria-live="polite">
+          <small id="advanceFilterSelection">Todos os colaboradores</small>
+          <span id="advanceFilterPeriod" class="advance-filter-period">Todos os períodos</span>
+          <span id="advanceFilterCount">0 vales encontrados</span>
+          <b class="advance-total-label">Total dos vales</b>
+          <strong id="advanceFilterTotal">R$ 0,00</strong>
+        </div>
+      </div>
+      <div class="advance-filters">
+        <fieldset class="advance-employee-filter-field">
+          <legend>Selecione um colaborador</legend>
+          <input id="advanceFilterEmployee" type="hidden" value="all">
+          <p class="advance-selection-help">Marque um nome para ver a soma dos vales dele no período. A escolha também será usada no cadastro do vale.</p>
+          <div id="advanceFilterEmployees" class="advance-employee-options" role="radiogroup" aria-label="Escolher colaborador"></div>
+        </fieldset>
+        <div class="field">
+          <label for="advanceFilterStart">Data inicial</label>
+          <input id="advanceFilterStart" type="date">
+        </div>
+        <div class="field">
+          <label for="advanceFilterEnd">Data final</label>
+          <input id="advanceFilterEnd" type="date">
+        </div>
+        <button class="btn btn-secondary" id="clearAdvanceFiltersBtn" type="button">Limpar filtro</button>
+      </div>
+    </section>
+    <div id="advancesList" class="advances-list"></div>
+  </dialog>
+
+  <dialog id="reportDialog" class="dialog report-dialog">
+    <div class="dialog-header no-print">
+      <div><p class="eyebrow accent">RELATÓRIO</p><h2>Controles de acesso e pagamentos</h2></div>
+      <button class="close-btn" data-close="reportDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div class="report-selection no-print">
+      <div class="field">
+        <label for="reportEmployeeSelect">Escolha o colaborador do relatório</label>
+        <select id="reportEmployeeSelect">
+          <option value="">Selecione um colaborador</option>
+        </select>
+      </div>
+      <p id="reportSelectionSummary" aria-live="polite">Selecione um nome para preparar o PDF individual.</p>
+    </div>
+    <div class="report-toolbar no-print">
+      <button class="btn btn-primary" id="printReportBtn" type="button" disabled>Salvar PDF do colaborador</button>
+      <button class="btn btn-secondary" id="copyWhatsappBtn" type="button" disabled>Copiar para WhatsApp</button>
+      <button class="btn btn-secondary" id="exportCsvBtn" type="button" disabled>Baixar planilha CSV</button>
+    </div>
+    <p class="report-format-note no-print">Relatório em A4 Retrato, com uma folha por colaborador e espaço confortável para assinatura.</p>
+    <div class="share-preview no-print">
+      <label for="whatsappText">Mensagem pronta para copiar</label>
+      <textarea id="whatsappText" rows="10" readonly></textarea>
+      <small>Nada será enviado automaticamente.</small>
+    </div>
+    <div id="printableReport" class="printable-report"></div>
+  </dialog>
+
+  <dialog id="bulkPaymentDialog" class="dialog payment-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">PAGAMENTO DO COLABORADOR</p><h2>Finalizar como pago</h2></div>
+      <button class="close-btn" data-close="bulkPaymentDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <form id="bulkPaymentForm" class="bulk-payment-form">
+      <div class="payment-confirmation">
+        <span>Colaborador</span>
+        <strong id="bulkPaymentEmployeeName">—</strong>
+        <p id="bulkPaymentSummary">—</p>
+      </div>
+      <div class="field">
+        <label for="bulkPaymentDate">Data em que o pagamento foi feito</label>
+        <input id="bulkPaymentDate" type="date" required>
+        <small>Esta mesma data será registrada em todas as jornadas não pagas mostradas no período selecionado.</small>
+      </div>
+      <div id="bulkPaymentError" class="form-error" role="alert" hidden></div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" data-close="bulkPaymentDialog" type="button">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Confirmar pagamento</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="logic.js?v=18"></script>
+  <script src="app.js?v=18"></script>
+</body>
+</html>

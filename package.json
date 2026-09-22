@@ -1,0 +1,19 @@
+{
+  "name": "nespoli-concreto-ponto-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build-worker.mjs",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.119.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "APP_PASSWORD": {
+        "description": "Crie uma senha forte para entrar no aplicativo da Nespoli Concreto. Não use a senha da sua conta Cloudflare."
+      }
+    }
+  }
+}

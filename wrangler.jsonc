@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nespoli-concreto-ponto",
+  "main": "./index.js",
+  "compatibility_date": "2026-09-22",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nespoli-concreto-ponto-db"
+    }
+  ]
+}
