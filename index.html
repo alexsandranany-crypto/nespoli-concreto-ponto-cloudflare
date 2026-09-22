@@ -273,6 +273,13 @@
           <input id="employeeMonthlyHours" type="number" min="1" step="1" inputmode="numeric" value="220">
         </div>
       </div>
+      <div class="field pay-schedule-field">
+        <label for="employeePaySchedule">Quando pagar</label>
+        <select id="employeePaySchedule">
+          <option value="period">Conforme o fechamento</option>
+          <option value="monthlyFifthWeekday">Mensal — 5º dia útil</option>
+        </select>
+      </div>
       <button class="btn btn-primary" type="submit" id="saveEmployeeBtn">Adicionar</button>
       <button class="btn btn-secondary" type="button" id="cancelEmployeeEditBtn" hidden>Cancelar</button>
     </form>

@@ -286,6 +286,7 @@ td.negative-text { color: var(--danger) !important; }
 .employee-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 20px 22px 13px; }
 .employee-form .grow { flex: 1 1 230px; min-width: 0; }
 .payment-type-field { flex: 0 1 165px; }
+.pay-schedule-field { flex: 1 1 220px; }
 .rate-field { flex: 0 0 155px; }
 .monthly-payment-fields { display: grid; flex: 1 1 340px; grid-template-columns: minmax(180px, 1fr) minmax(130px, .6fr); align-items: end; gap: 10px; }
 .monthly-payment-fields[hidden] { display: none; }
@@ -295,6 +296,7 @@ td.negative-text { color: var(--danger) !important; }
 .employee-info { min-width: 0; }
 .employee-info strong { display: block; overflow: hidden; font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
 .employee-info small { color: #778195; font-size: .7rem; }
+.employee-info small.employee-pay-schedule, .group-person small.employee-pay-schedule { display: block; margin-top: 4px; color: #5c6679; font-weight: 750; }
 .employee-actions { display: flex; gap: 6px; }
 .employees-list .empty-mini { padding: 28px; color: #7a8495; font-size: .82rem; text-align: center; }
 .employees-dialog > .form-error { margin: 0 22px 8px; }

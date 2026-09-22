@@ -196,5 +196,22 @@
     return { start: "", end: "" };
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, parseMoneyInput, roundMoney, timeToMinutes };
+  function getFifthWeekdayPaymentDate(referenceDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(referenceDate || ""));
+    if (!match) return "";
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) return "";
+
+    const date = new Date(Date.UTC(year, month, 1));
+    let weekdays = 0;
+    while (weekdays < 5) {
+      const day = date.getUTCDay();
+      if (day >= 1 && day <= 5) weekdays += 1;
+      if (weekdays < 5) date.setUTCDate(date.getUTCDate() + 1);
+    }
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  }
+
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
 });

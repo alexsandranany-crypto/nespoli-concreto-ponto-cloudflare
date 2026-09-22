@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 5, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 6, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = "close20";
   let activeRateEmployeeId = null;
@@ -44,6 +44,7 @@
     absenceAlert: $("#absenceAlert"), absenceAlertText: $("#absenceAlertText"),
     employeesDialog: $("#employeesDialog"), employeeForm: $("#employeeForm"), employeeId: $("#employeeId"), employeeName: $("#employeeName"),
     employeeRate: $("#employeeRate"), employeeRateField: $("#employeeRateField"), employeePaymentType: $("#employeePaymentType"),
+    employeePaySchedule: $("#employeePaySchedule"),
     employeeMonthlyFields: $("#employeeMonthlyFields"), employeeMonthlySalary: $("#employeeMonthlySalary"), employeeMonthlyHours: $("#employeeMonthlyHours"),
     employeeError: $("#employeeError"), employeesList: $("#employeesList"), saveEmployeeBtn: $("#saveEmployeeBtn"),
     cancelEmployeeEditBtn: $("#cancelEmployeeEditBtn"), backupDialog: $("#backupDialog"), backupFile: $("#backupFile"), backupMeta: $("#backupMeta"),
@@ -93,7 +94,7 @@
   }
 
   function normalizeState(data) {
-    data.version = 5;
+    data.version = 6;
     data.advances = Array.isArray(data.advances) ? data.advances : [];
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
@@ -108,6 +109,7 @@
       return {
         ...employee,
         paymentType,
+        paySchedule: employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period",
         dailyRate: normalizedHistory.at(-1)?.dailyRate || Number(employee.dailyRate) || 0,
         rateHistory: normalizedHistory,
         monthlySalary: L.roundMoney(Number(employee.monthlySalary) || 0),
@@ -348,6 +350,7 @@
     const rate = Number(dom.employeeRate.value);
     const monthlySalary = Number(dom.employeeMonthlySalary.value);
     const monthlyHours = Number(dom.employeeMonthlyHours.value);
+    const paySchedule = dom.employeePaySchedule.value === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
     const editing = Boolean(dom.employeeId.value);
     if (!name) return showError(dom.employeeError, "Informe o nome do colaborador.");
     if (paymentType === "daily" && (!Number.isFinite(rate) || rate <= 0)) return showError(dom.employeeError, "Informe uma diária válida.");
@@ -368,6 +371,7 @@
         Object.assign(employee, {
           name,
           paymentType,
+          paySchedule,
           monthlySalary: paymentType === "monthly" ? L.roundMoney(monthlySalary) : Number(employee.monthlySalary) || 0,
           monthlyHours: paymentType === "monthly" ? monthlyHours : Number(employee.monthlyHours) || 220,
           updatedAt: new Date().toISOString()
@@ -380,6 +384,7 @@
         id: uid(),
         name,
         paymentType,
+        paySchedule,
         dailyRate,
         rateHistory: paymentType === "daily" ? [{ id: uid(), startDate: "0000-01-01", dailyRate }] : [],
         monthlySalary: paymentType === "monthly" ? L.roundMoney(monthlySalary) : 0,
@@ -411,6 +416,7 @@
       dom.employeeId.value = employee.id;
       dom.employeeName.value = employee.name;
       dom.employeePaymentType.value = employee.paymentType === "monthly" ? "monthly" : "daily";
+      dom.employeePaySchedule.value = employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
       dom.employeeRate.value = employee.dailyRate ? Number(employee.dailyRate).toFixed(2) : "";
       dom.employeeMonthlySalary.value = employee.monthlySalary ? Number(employee.monthlySalary).toFixed(2) : "";
       dom.employeeMonthlyHours.value = Number(employee.monthlyHours) || 220;
@@ -440,6 +446,7 @@
     dom.employeeForm.reset();
     dom.employeeId.value = "";
     dom.employeePaymentType.value = "daily";
+    dom.employeePaySchedule.value = "period";
     dom.employeeMonthlyHours.value = "220";
     updateEmployeePaymentFields();
     dom.saveEmployeeBtn.textContent = "Adicionar";
@@ -509,6 +516,20 @@
     return config.paymentType === "monthly"
       ? `Mensal ${currency.format(config.monthlySalary)} • ${config.monthlyHours}h/mês`
       : `Diária ${currency.format(config.dailyRate)}`;
+  }
+
+  function paymentScheduleLabel(employee, workEntries = []) {
+    if (employee?.paySchedule !== "monthlyFifthWeekday") return "Pagamento conforme o fechamento";
+    const pendingDates = workEntries
+      .filter((entry) => !L.isAbsence(entry) && entry.status !== "paid" && entry.date)
+      .map((entry) => entry.date)
+      .sort();
+    const allDates = workEntries.filter((entry) => !L.isAbsence(entry) && entry.date).map((entry) => entry.date).sort();
+    const referenceDate = pendingDates[0] || allDates.at(-1) || "";
+    const dueDate = L.getFifthWeekdayPaymentDate(referenceDate);
+    return dueDate
+      ? `Pagamento mensal • 5º dia útil (seg–sex) • previsão ${dateBR(dueDate)}`
+      : "Pagamento mensal • 5º dia útil (segunda a sexta)";
   }
 
   function paymentStatusText(summary) {
@@ -1066,8 +1087,9 @@
       const summary = config.paymentType === "monthly"
         ? `Mensalista • ${currency.format(config.monthlySalary)} • ${config.monthlyHours}h/mês`
         : `${currency.format(config.dailyRate)} vigente • ${employee.rateHistory.length} diária(s) no histórico`;
+      const schedule = paymentScheduleLabel(employee, employeeEntries);
       return `<div class="employee-item">
-        <div class="employee-info"><strong>${escapeHTML(employee.name)}</strong><small>${summary} • ${journeyCount} jornada(s) • ${absenceCount} falta(s)</small></div>
+        <div class="employee-info"><strong>${escapeHTML(employee.name)}</strong><small>${summary} • ${journeyCount} jornada(s) • ${absenceCount} falta(s)</small><small class="employee-pay-schedule">${escapeHTML(schedule)}</small></div>
         <div class="employee-actions">
           ${config.paymentType === "daily" ? `<button class="mini-btn rate" data-employee-action="rates" data-id="${employee.id}" type="button">Diárias</button>` : ""}
           <button class="mini-btn" data-employee-action="edit" data-id="${employee.id}" type="button">Editar</button>
@@ -1162,6 +1184,7 @@
       const items = group.entries;
       const groupAdvances = group.advances;
       const name = displayEmployeeName(employeeId, items[0] || groupAdvances[0]);
+      const employee = getEmployee(employeeId);
       const absenceItems = items.filter(L.isAbsence);
       const workRows = items.filter((entry) => !L.isAbsence(entry)).map((entry) => ({ entry, calc: calculateEntry(entry) })).filter((item) => item.calc.valid);
       const displayRows = items.map((entry) => ({ entry, calc: calculateEntry(entry) })).filter((item) => item.calc.valid);
@@ -1170,13 +1193,14 @@
       const advancesTotal = groupAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       const net = gross - advancesTotal;
       const paymentSummary = L.summarizePayments(workRows.map(({ entry }) => entry));
+      const schedule = paymentScheduleLabel(employee, items);
       const paymentActions = workRows.length ? `<div class="group-payment-actions">
         ${paymentSummary.pendingCount ? `<button class="mini-btn payment-action" data-group-action="pay" data-employee-id="${employeeId}" type="button">Finalizar pagamento</button>` : ""}
         ${paymentSummary.paidCount ? `<button class="mini-btn" data-group-action="unpay" data-employee-id="${employeeId}" type="button">Marcar não pago</button>` : ""}
       </div>` : "";
       return `<section class="employee-group">
         <header class="group-header">
-          <div class="group-person"><div class="avatar">${escapeHTML(initials(name))}</div><div class="group-person-copy"><div class="group-person-title"><h3>${escapeHTML(name)}</h3>${workRows.length ? `<span class="group-payment-status ${paymentSummary.status}">${paymentStatusText(paymentSummary)}</span>` : ""}${absenceItems.length ? `<span class="group-absence-status">${absenceItems.length} ${absenceItems.length === 1 ? "falta" : "faltas"}</span>` : ""}</div><small>${workRows.length} jornada(s) • ${absenceItems.length} falta(s) • ${groupAdvances.length} vale(s)</small>${paymentActions}</div></div>
+          <div class="group-person"><div class="avatar">${escapeHTML(initials(name))}</div><div class="group-person-copy"><div class="group-person-title"><h3>${escapeHTML(name)}</h3>${workRows.length ? `<span class="group-payment-status ${paymentSummary.status}">${paymentStatusText(paymentSummary)}</span>` : ""}${absenceItems.length ? `<span class="group-absence-status">${absenceItems.length} ${absenceItems.length === 1 ? "falta" : "faltas"}</span>` : ""}</div><small>${workRows.length} jornada(s) • ${absenceItems.length} falta(s) • ${groupAdvances.length} vale(s)</small>${employee?.paySchedule === "monthlyFifthWeekday" ? `<small class="employee-pay-schedule">${escapeHTML(schedule)}</small>` : ""}${paymentActions}</div></div>
           <div class="group-totals"><div><span>Horas</span><strong>${L.formatDuration(minutes)}</strong></div><div><span>Bruto</span><strong>${currency.format(gross)}</strong></div><div><span>Vales</span><strong>− ${currency.format(advancesTotal)}</strong></div><div><span>Líquido</span><strong>${currency.format(net)}</strong></div></div>
         </header>
         ${displayRows.length ? `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Jornada</th><th>Intervalo</th><th>Horas</th><th>Base de cálculo</th><th>Valor</th><th>Status</th><th>Observação</th><th></th></tr></thead><tbody>${displayRows.map(({ entry, calc }) => renderEntryRow(entry, calc)).join("")}</tbody></table></div>` : ""}
@@ -1313,7 +1337,7 @@
     });
     const outstanding = L.summarizeOutstanding(outstandingItems, advances);
     let grossTotal = 0, paid = 0, advancesTotal = 0;
-    const sections = groupForReport(entries, advances).map(({ name, entries: items, advances: employeeAdvances }) => {
+    const sections = groupForReport(entries, advances).map(({ employeeId, name, entries: items, advances: employeeAdvances }) => {
       let subtotal = 0, minutes = 0;
       const absenceCount = items.filter(L.isAbsence).length;
       const lines = items.sort((a, b) => a.date.localeCompare(b.date)).map((entry) => {
@@ -1331,7 +1355,9 @@
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       advancesTotal += employeeAdvancesTotal;
       const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"}`);
-      return `*${name}*\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*`;
+      const employee = getEmployee(employeeId);
+      const scheduleLine = employee?.paySchedule === "monthlyFifthWeekday" ? `\n${paymentScheduleLabel(employee, items)}` : "";
+      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*`;
     });
     return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\nJornadas pagas: ${currency.format(paid)}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
   }
@@ -1344,7 +1370,7 @@
 
     const generatedAt = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
-    return groups.map(({ name, entries: items, advances: employeeAdvances }, groupIndex) => {
+    return groups.map(({ employeeId, name, entries: items, advances: employeeAdvances }, groupIndex) => {
       let subtotal = 0, minutes = 0;
       let paidSubtotal = 0, pendingSubtotal = 0;
       const absenceCount = items.filter(L.isAbsence).length;
@@ -1371,6 +1397,8 @@
       const netTotal = subtotal - employeeAdvancesTotal;
       const pendingNetSubtotal = pendingSubtotal === 0 ? 0 : pendingSubtotal - employeeAdvancesTotal;
       const paymentSummary = L.summarizePayments(workItems);
+      const employee = getEmployee(employeeId);
+      const schedule = paymentScheduleLabel(employee, items);
       const statusLabel = workItems.length
         ? paymentStatusText(paymentSummary)
         : absenceCount ? `${absenceCount} ${absenceCount === 1 ? "falta registrada" : "faltas registradas"}` : "Somente vales";
@@ -1400,7 +1428,7 @@
           <div><span>Vales</span><strong>− ${currency.format(employeeAdvancesTotal)}</strong></div>
           <div class="payslip-net"><span>Valor líquido</span><strong>${currency.format(netTotal)}</strong></div>
         </div>
-        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSubtotal)}</strong></span></div>
+        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSubtotal)}</strong></span>${employee?.paySchedule === "monthlyFifthWeekday" ? `<span>Programação: <strong>${escapeHTML(schedule)}</strong></span>` : ""}</div>
         <div class="payslip-receipt">
           <p>Declaro que conferi as jornadas, as faltas, os vales e os valores acima referentes ao período informado.</p>
           <p class="payslip-date-line">Tangará da Serra, ______ de ____________________ de __________.</p>
@@ -1439,7 +1467,7 @@
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 5, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 6, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {

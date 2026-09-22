@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, parseMoneyInput } = require("./logic.js");
+const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
 
 assert.equal(parseMoneyInput("18,00"), 18);
 assert.equal(parseMoneyInput("49.99"), 49.99);
@@ -66,6 +66,9 @@ assert.equal(resolveRateHistory(rateHistory, "2026-09-13"), 150);
 assert.equal(formatDuration(485), "8h05");
 assert.deepEqual(getClosePeriod("close20", new Date(2026, 8, 14)), { start: "2026-09-08", end: "2026-09-20" });
 assert.deepEqual(getClosePeriod("close7", new Date(2026, 8, 14)), { start: "2026-08-21", end: "2026-09-07" });
+assert.equal(getFifthWeekdayPaymentDate("2026-09-21"), "2026-10-07");
+assert.equal(getFifthWeekdayPaymentDate("2026-12-31"), "2027-01-07");
+assert.equal(getFifthWeekdayPaymentDate("data-invalida"), "");
 
 assert.deepEqual(summarizePayments([
   { status: "pending" },
