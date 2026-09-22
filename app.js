@@ -1369,7 +1369,7 @@
 
       return `<section class="payslip${lastClass}${densityClass}">
         <header class="payslip-header">
-          <div class="payslip-company"><div class="payslip-logo"><img src="assets/logo-nespoli-concreto.png" alt="Nespoli Concreto"></div><div><strong>NESPOLI CONCRETO</strong><span>Controle de acesso e pagamentos</span></div></div>
+          <div class="payslip-company"><div class="payslip-logo"><img src="logo-nespoli-concreto.png" alt="Nespoli Concreto"></div><div><strong>NESPOLI CONCRETO</strong><span>Controle de acesso e pagamentos</span></div></div>
           <div class="payslip-heading"><span>Relatório individual</span><strong>ACESSO E PAGAMENTOS</strong></div>
         </header>
         <div class="payslip-meta">
