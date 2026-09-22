@@ -7,7 +7,7 @@ const files = [
   ["/styles.css", "styles.css"],
   ["/logic.js", "logic.js"],
   ["/app.js", "app.js"],
-  ["/logo-nespoli-concreto.png", "logo-nespoli-concreto.png"]
+  ["/assets/logo-nespoli-concreto.png", "assets/logo-nespoli-concreto.png"]
 ];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
