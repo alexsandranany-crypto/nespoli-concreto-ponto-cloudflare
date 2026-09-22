@@ -167,6 +167,30 @@
     };
   }
 
+  function summarizePaid(items = [], advances = []) {
+    const safeItems = Array.isArray(items) ? items : [];
+    const paidItems = safeItems.filter((item) => item?.status === "paid");
+    const pendingEmployeeIds = new Set(safeItems
+      .filter((item) => item?.status !== "paid")
+      .map((item) => item?.employeeId)
+      .filter(Boolean));
+    const paidEmployeeIds = new Set(paidItems.map((item) => item?.employeeId).filter(Boolean));
+    const fullyPaidEmployeeIds = new Set([...paidEmployeeIds].filter((employeeId) => !pendingEmployeeIds.has(employeeId)));
+    const paidGross = roundMoney(paidItems.reduce((sum, item) => sum + Number(item?.finalValue || 0), 0));
+    const paidAdvances = roundMoney((Array.isArray(advances) ? advances : [])
+      .filter((advance) => fullyPaidEmployeeIds.has(advance?.employeeId))
+      .reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
+    const paymentDates = [...new Set(paidItems.map((item) => String(item?.paidDate || "")).filter(Boolean))].sort();
+    return {
+      paidGross,
+      paidAdvances,
+      paidNet: roundMoney(paidGross - paidAdvances),
+      paidEmployeeCount: paidEmployeeIds.size,
+      latestPaidDate: paymentDates.at(-1) || "",
+      paymentDates
+    };
+  }
+
   function isAbsence(entry) {
     return entry?.recordType === "absence";
   }
@@ -213,5 +237,5 @@
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
 });

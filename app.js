@@ -31,7 +31,8 @@
 
   const dom = {
     saveStatus: $("#saveStatus"), periodLabel: $("#periodLabel"), statEmployees: $("#statEmployees"), statEntries: $("#statEntries"),
-    statHours: $("#statHours"), statTotal: $("#statTotal"), statAdvances: $("#statAdvances"), statPending: $("#statPending"), statPaid: $("#statPaid"),
+    statHours: $("#statHours"), statTotal: $("#statTotal"), statAdvances: $("#statAdvances"), statPending: $("#statPending"),
+    statPaidNet: $("#statPaidNet"), statPaidDetails: $("#statPaidDetails"), statPendingDetails: $("#statPendingDetails"),
     entryForm: $("#entryForm"), entryId: $("#entryId"), employeeSelect: $("#employeeSelect"), workDate: $("#workDate"), recordType: $("#recordType"),
     startTime: $("#startTime"), breakStart: $("#breakStart"), breakEnd: $("#breakEnd"), endTime: $("#endTime"),
     valueMode: $("#valueMode"), manualValue: $("#manualValue"), manualReason: $("#manualReason"), notes: $("#notes"), paymentStatus: $("#paymentStatus"),
@@ -971,13 +972,19 @@
   function openPaymentConfirmation(entries, employeeId) {
     if (!entries.length) return toast("Não há jornadas não pagas neste período.");
     const employee = getEmployee(employeeId);
-    const total = entries.reduce((sum, entry) => {
+    const grossTotal = entries.reduce((sum, entry) => {
       const calculation = calculateEntry(entry);
       return sum + (calculation.valid ? calculation.finalValue : 0);
     }, 0);
+    const selectedIds = new Set(entries.map((entry) => entry.id));
+    const hasRemainingPending = visibleEmployeeEntries(employeeId)
+      .some((entry) => entry.status !== "paid" && !selectedIds.has(entry.id));
+    const advancesToDiscount = hasRemainingPending ? 0 : getFilteredAdvances(employeeId)
+      .reduce((sum, advance) => sum + Number(advance.value || 0), 0);
+    const netTotal = L.roundMoney(grossTotal - advancesToDiscount);
     activeBulkPaymentEntryIds = entries.map((entry) => entry.id);
     dom.bulkPaymentEmployeeName.textContent = employee?.name || entries[0]?.employeeNameSnapshot || "Colaborador";
-    dom.bulkPaymentSummary.textContent = `${entries.length} ${entries.length === 1 ? "jornada não paga" : "jornadas não pagas"} • ${currency.format(total)}`;
+    dom.bulkPaymentSummary.textContent = `${entries.length} ${entries.length === 1 ? "jornada não paga" : "jornadas não pagas"} • bruto ${currency.format(grossTotal)} • vales ${currency.format(advancesToDiscount)} • total líquido a pagar ${currency.format(netTotal)}`;
     dom.bulkPaymentDate.value = todayISO();
     hideError(dom.bulkPaymentError);
     dom.bulkPaymentDialog.showModal();
@@ -1130,21 +1137,27 @@
     const grossValue = computed.reduce((sum, item) => sum + item.calculation.finalValue, 0);
     const advancesValue = advances.reduce((sum, advance) => sum + Number(advance.value), 0);
     const netValue = grossValue - advancesValue;
-    const outstanding = L.summarizeOutstanding(computed.map(({ entry, calculation }) => ({
+    const paymentItems = computed.map(({ entry, calculation }) => ({
       employeeId: entry.employeeId,
       status: entry.status,
+      paidDate: entry.paidDate,
       finalValue: calculation.finalValue
-    })), advances);
+    }));
+    const outstanding = L.summarizeOutstanding(paymentItems, advances);
+    const paidSummary = L.summarizePaid(paymentItems, advances);
     const pendingGross = outstanding.pendingGross;
     const pending = outstanding.pendingNet;
-    const paid = grossValue - pendingGross;
     dom.statEmployees.textContent = new Set([...entries.map((entry) => entry.employeeId), ...advances.map((advance) => advance.employeeId)]).size;
     dom.statEntries.textContent = `${workEntries.length} jornada(s) • ${absences.length} falta(s) • ${advances.length} vale(s)`;
     dom.statHours.textContent = L.formatDuration(totalMinutes);
     dom.statTotal.textContent = currency.format(netValue);
     dom.statAdvances.textContent = `Bruto: ${currency.format(grossValue)} • Vales: ${currency.format(advancesValue)}`;
+    dom.statPaidNet.textContent = currency.format(paidSummary.paidNet);
+    dom.statPaidDetails.textContent = paidSummary.latestPaidDate
+      ? `${paidSummary.paymentDates.length > 1 ? "Último pagamento" : "Pago"} em ${dateBR(paidSummary.latestPaidDate)} • vales descontados: ${currency.format(paidSummary.paidAdvances)}`
+      : "Nenhum pagamento registrado neste período";
     dom.statPending.textContent = currency.format(pending);
-    dom.statPaid.textContent = `Jornadas pagas: ${currency.format(paid)}`;
+    dom.statPendingDetails.textContent = `Bruto pendente: ${currency.format(pendingGross)} • vales: ${currency.format(outstanding.pendingAdvances)}`;
     renderAbsenceAlert(absences);
     updatePeriodLabel();
     dom.emptyState.hidden = entries.length > 0 || advances.length > 0;
@@ -1333,10 +1346,11 @@
     if (!entries.length && !advances.length) return `*NESPOLI CONCRETO*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
     const outstandingItems = entries.filter((entry) => !L.isAbsence(entry)).map((entry) => {
       const calc = calculateEntry(entry);
-      return { employeeId: entry.employeeId, status: entry.status, finalValue: calc.valid ? calc.finalValue : 0 };
+      return { employeeId: entry.employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
     });
     const outstanding = L.summarizeOutstanding(outstandingItems, advances);
-    let grossTotal = 0, paid = 0, advancesTotal = 0;
+    const paidSummary = L.summarizePaid(outstandingItems, advances);
+    let grossTotal = 0, advancesTotal = 0;
     const sections = groupForReport(entries, advances).map(({ employeeId, name, entries: items, advances: employeeAdvances }) => {
       let subtotal = 0, minutes = 0;
       const absenceCount = items.filter(L.isAbsence).length;
@@ -1344,7 +1358,6 @@
         if (L.isAbsence(entry)) return `• ${dateBR(entry.date)} | *FALTA* | ${entry.notes || "Sem justificativa informada"}`;
         const calc = calculateEntry(entry);
         subtotal += calc.finalValue; minutes += calc.workedMinutes; grossTotal += calc.finalValue;
-        if (entry.status === "paid") paid += calc.finalValue;
         const adjustment = calc.manualValue !== null ? ` • ajuste: ${entry.manualReason || "valor manual"}` : "";
         const balance = entry.valueMode === "balance8h" ? ` • saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : "";
         const paymentLabel = entry.status === "paid"
@@ -1357,9 +1370,17 @@
       const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"}`);
       const employee = getEmployee(employeeId);
       const scheduleLine = employee?.paySchedule === "monthlyFifthWeekday" ? `\n${paymentScheduleLabel(employee, items)}` : "";
-      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*`;
+      const employeePaidSummary = L.summarizePaid(items.filter((entry) => !L.isAbsence(entry)).map((entry) => {
+        const calc = calculateEntry(entry);
+        return { employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
+      }), employeeAdvances);
+      const paidLine = employeePaidSummary.latestPaidDate
+        ? `\n*Total pago líquido: ${currency.format(employeePaidSummary.paidNet)}* • ${employeePaidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(employeePaidSummary.latestPaidDate)}`
+        : "\nTotal pago líquido: R$ 0,00 • ainda não pago";
+      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
     });
-    return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\nJornadas pagas: ${currency.format(paid)}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
+    const paidDateLine = paidSummary.latestPaidDate ? ` • ${paidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(paidSummary.latestPaidDate)}` : "";
+    return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
   }
 
   function buildPrintableReport(entries, advances) {
@@ -1397,6 +1418,14 @@
       const netTotal = subtotal - employeeAdvancesTotal;
       const pendingNetSubtotal = pendingSubtotal === 0 ? 0 : pendingSubtotal - employeeAdvancesTotal;
       const paymentSummary = L.summarizePayments(workItems);
+      const paidNetSummary = L.summarizePaid(workItems.map((entry) => {
+        const calc = calculateEntry(entry);
+        return { employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
+      }), employeeAdvances);
+      const paidStateLabel = paidNetSummary.paidGross === 0 ? "NÃO PAGO" : pendingSubtotal > 0 ? "PAGO PARCIAL" : "PAGO";
+      const paidDateLabel = paidNetSummary.latestPaidDate
+        ? `${paidNetSummary.paymentDates.length > 1 ? "Último pagamento" : "Pagamento"}: ${dateBR(paidNetSummary.latestPaidDate)}`
+        : "Nenhum pagamento registrado";
       const employee = getEmployee(employeeId);
       const schedule = paymentScheduleLabel(employee, items);
       const statusLabel = workItems.length
@@ -1428,6 +1457,7 @@
           <div><span>Vales</span><strong>− ${currency.format(employeeAdvancesTotal)}</strong></div>
           <div class="payslip-net"><span>Valor líquido</span><strong>${currency.format(netTotal)}</strong></div>
         </div>
+        <div class="payslip-paid-box"><div><span>TOTAL PAGO LÍQUIDO</span><strong>${currency.format(paidNetSummary.paidNet)}</strong><small>Período: ${reportPeriodText()} • ${paidDateLabel} • vales descontados: ${currency.format(paidNetSummary.paidAdvances)}</small></div><b>${paidStateLabel}</b></div>
         <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSubtotal)}</strong></span>${employee?.paySchedule === "monthlyFifthWeekday" ? `<span>Programação: <strong>${escapeHTML(schedule)}</strong></span>` : ""}</div>
         <div class="payslip-receipt">
           <p>Declaro que conferi as jornadas, as faltas, os vales e os valores acima referentes ao período informado.</p>

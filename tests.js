@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
+const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
 
 assert.equal(parseMoneyInput("18,00"), 18);
 assert.equal(parseMoneyInput("49.99"), 49.99);
@@ -103,6 +103,33 @@ assert.deepEqual(summarizeOutstanding([
   pendingAdvances: 0,
   pendingNet: 0,
   pendingEmployeeCount: 0
+});
+assert.deepEqual(summarizePaid([
+  { employeeId: "alice", status: "pending", finalValue: 978.25 },
+  { employeeId: "joao", status: "paid", paidDate: "2026-09-21", finalValue: 1000 }
+], [
+  { employeeId: "alice", value: 49.99 },
+  { employeeId: "joao", value: 609.58 }
+]), {
+  paidGross: 1000,
+  paidAdvances: 609.58,
+  paidNet: 390.42,
+  paidEmployeeCount: 1,
+  latestPaidDate: "2026-09-21",
+  paymentDates: ["2026-09-21"]
+});
+assert.deepEqual(summarizePaid([
+  { employeeId: "alice", status: "paid", paidDate: "2026-09-21", finalValue: 500 },
+  { employeeId: "alice", status: "pending", finalValue: 478.25 }
+], [
+  { employeeId: "alice", value: 49.99 }
+]), {
+  paidGross: 500,
+  paidAdvances: 0,
+  paidNet: 500,
+  paidEmployeeCount: 1,
+  latestPaidDate: "2026-09-21",
+  paymentDates: ["2026-09-21"]
 });
 assert.equal(isAbsence({ recordType: "absence" }), true);
 assert.equal(isAbsence({ recordType: "work" }), false);

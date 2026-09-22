@@ -95,7 +95,7 @@ button { cursor: pointer; }
 }
 .chip:hover, .chip.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 .stat-card {
   position: relative;
   overflow: hidden;
@@ -107,6 +107,8 @@ button { cursor: pointer; }
   box-shadow: 0 8px 24px rgba(16,32,57,.045);
 }
 .stat-card::after { content: ""; position: absolute; right: -20px; bottom: -34px; width: 88px; height: 88px; border-radius: 50%; background: #eef1f6; }
+.stat-card.paid::after { background: #d9f5e9; }
+.stat-card.paid strong { color: #14704f; }
 .stat-card.warning::after { background: #ffe3cf; }
 .stat-card span { position: relative; z-index: 1; display: block; color: var(--ink-soft); font-size: .78rem; font-weight: 700; }
 .stat-card strong { position: relative; z-index: 1; display: block; margin: 8px 0 3px; font-size: clamp(1.35rem, 2vw, 1.8rem); letter-spacing: -.04em; }
@@ -397,6 +399,11 @@ td.negative-text { color: var(--danger) !important; }
 .payslip-totals .payslip-net { background: var(--yellow); }
 .payslip-totals .payslip-net span { color: #292929; }
 .payslip-payment-details { display: flex; justify-content: flex-end; gap: 22px; padding: 0 15px 11px; color: #525866; font-size: .72rem; }
+.payslip-paid-box { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 15px 11px; padding: 10px 13px; border: 1px solid #9ecfbc; border-radius: 9px; background: #effaf5; }
+.payslip-paid-box > div { min-width: 0; }
+.payslip-paid-box span, .payslip-paid-box small { display: block; color: #426557; font-size: .68rem; }
+.payslip-paid-box strong { display: block; margin-top: 2px; color: #0f6848; font-size: 1.05rem; }
+.payslip-paid-box b { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: #167852; color: #fff; font-size: .66rem; letter-spacing: .05em; }
 .payslip-receipt { margin: 0 15px 15px; padding: 14px 15px 11px; border-top: 1px dashed #8b8b8b; background: #fafafa; text-align: center; }
 .payslip-receipt p { margin: 0; font-size: .74rem; }
 .payslip-receipt .payslip-date-line { margin-top: 11px; }
@@ -637,6 +644,10 @@ td { padding: 13px; font-size: .9rem; }
   .payslip-totals > div { gap: 1px; padding: 4px 6px; }
   .payslip-totals strong { font-size: 8pt; }
   .payslip-payment-details { justify-content: space-between; gap: 10px; padding: 0 8px 7px; font-size: 6.5pt; }
+  .payslip-paid-box { margin: 0 8px 7px; padding: 5px 8px; border-radius: 5px; }
+  .payslip-paid-box span, .payslip-paid-box small { font-size: 5.8pt; }
+  .payslip-paid-box strong { font-size: 8pt; }
+  .payslip-paid-box b { padding: 3px 6px; font-size: 5.6pt; }
   .payslip-receipt { margin: 0 8px 8px; padding: 10px 10px 8px; }
   .payslip-receipt p { font-size: 6.6pt; }
   .payslip-receipt .payslip-date-line { margin-top: 8px; }
@@ -660,7 +671,8 @@ td { padding: 13px; font-size: .9rem; }
   .payslip.print-ultra-compact .payslip-totals { margin-block: 3px; }
   .payslip.print-ultra-compact .payslip-totals > div { padding-block: 3px; }
   .payslip.print-ultra-compact .payslip-payment-details { padding-bottom: 3px; font-size: 5.8pt; }
+  .payslip.print-ultra-compact .payslip-paid-box { margin-bottom: 3px; padding-block: 3px; }
   .payslip.print-ultra-compact .payslip-receipt { margin-bottom: 4px; padding-block: 3px; }
   .payslip.print-ultra-compact .signature-line { margin-top: 24px; }
-  .payslip-header, .payslip-totals .payslip-net { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .payslip-header, .payslip-totals .payslip-net, .payslip-paid-box, .payslip-paid-box b { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
