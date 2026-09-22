@@ -7,7 +7,7 @@ const files = [
   ["/styles.css", "styles.css"],
   ["/logic.js", "logic.js"],
   ["/app.js", "app.js"],
-  ["/assets/logo-nespoli-concreto.png", "assets/logo-nespoli-concreto.png"]
+  ["/logo-nespoli-concreto.png", "logo-nespoli-concreto.png"]
 ];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -34,4 +34,11 @@ const target = resolve(projectRoot, "index.js");
 const deployTarget = resolve(projectRoot, "dist/server/index.js");
 await mkdir(resolve(projectRoot, "dist/server"), { recursive: true });
 await Promise.all([writeFile(target, output), writeFile(deployTarget, output)]);
+if (process.env.APP_PASSWORD) {
+  await writeFile(
+    resolve(projectRoot, ".cloudflare-runtime-secrets.json"),
+    JSON.stringify({ APP_PASSWORD: process.env.APP_PASSWORD }),
+    { mode: 0o600 }
+  );
+}
 console.log(`Worker gerado com ${files.length} arquivos.`);
