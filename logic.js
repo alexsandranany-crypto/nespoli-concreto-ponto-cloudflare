@@ -151,6 +151,22 @@
     };
   }
 
+  function summarizeOutstanding(items = [], advances = []) {
+    const safeItems = Array.isArray(items) ? items : [];
+    const pendingItems = safeItems.filter((item) => item?.status !== "paid");
+    const pendingEmployeeIds = new Set(pendingItems.map((item) => item?.employeeId).filter(Boolean));
+    const pendingGross = roundMoney(pendingItems.reduce((sum, item) => sum + Number(item?.finalValue || 0), 0));
+    const pendingAdvances = roundMoney((Array.isArray(advances) ? advances : [])
+      .filter((advance) => pendingEmployeeIds.has(advance?.employeeId))
+      .reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
+    return {
+      pendingGross,
+      pendingAdvances,
+      pendingNet: roundMoney(pendingGross - pendingAdvances),
+      pendingEmployeeCount: pendingEmployeeIds.size
+    };
+  }
+
   function isAbsence(entry) {
     return entry?.recordType === "absence";
   }
@@ -180,5 +196,5 @@
     return { start: "", end: "" };
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, isAbsence, getClosePeriod, parseMoneyInput, roundMoney, timeToMinutes };
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, isAbsence, getClosePeriod, parseMoneyInput, roundMoney, timeToMinutes };
 });

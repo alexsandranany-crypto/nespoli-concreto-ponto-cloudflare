@@ -1108,8 +1108,13 @@
     const grossValue = computed.reduce((sum, item) => sum + item.calculation.finalValue, 0);
     const advancesValue = advances.reduce((sum, advance) => sum + Number(advance.value), 0);
     const netValue = grossValue - advancesValue;
-    const pendingGross = computed.filter((item) => item.entry.status === "pending").reduce((sum, item) => sum + item.calculation.finalValue, 0);
-    const pending = pendingGross - advancesValue;
+    const outstanding = L.summarizeOutstanding(computed.map(({ entry, calculation }) => ({
+      employeeId: entry.employeeId,
+      status: entry.status,
+      finalValue: calculation.finalValue
+    })), advances);
+    const pendingGross = outstanding.pendingGross;
+    const pending = outstanding.pendingNet;
     const paid = grossValue - pendingGross;
     dom.statEmployees.textContent = new Set([...entries.map((entry) => entry.employeeId), ...advances.map((advance) => advance.employeeId)]).size;
     dom.statEntries.textContent = `${workEntries.length} jornada(s) • ${absences.length} falta(s) • ${advances.length} vale(s)`;
@@ -1302,7 +1307,12 @@
 
   function buildWhatsappText(entries, advances) {
     if (!entries.length && !advances.length) return `*NESPOLI CONCRETO*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
-    let grossTotal = 0, paid = 0, pendingGross = 0, advancesTotal = 0;
+    const outstandingItems = entries.filter((entry) => !L.isAbsence(entry)).map((entry) => {
+      const calc = calculateEntry(entry);
+      return { employeeId: entry.employeeId, status: entry.status, finalValue: calc.valid ? calc.finalValue : 0 };
+    });
+    const outstanding = L.summarizeOutstanding(outstandingItems, advances);
+    let grossTotal = 0, paid = 0, advancesTotal = 0;
     const sections = groupForReport(entries, advances).map(({ name, entries: items, advances: employeeAdvances }) => {
       let subtotal = 0, minutes = 0;
       const absenceCount = items.filter(L.isAbsence).length;
@@ -1310,7 +1320,7 @@
         if (L.isAbsence(entry)) return `• ${dateBR(entry.date)} | *FALTA* | ${entry.notes || "Sem justificativa informada"}`;
         const calc = calculateEntry(entry);
         subtotal += calc.finalValue; minutes += calc.workedMinutes; grossTotal += calc.finalValue;
-        if (entry.status === "paid") paid += calc.finalValue; else pendingGross += calc.finalValue;
+        if (entry.status === "paid") paid += calc.finalValue;
         const adjustment = calc.manualValue !== null ? ` • ajuste: ${entry.manualReason || "valor manual"}` : "";
         const balance = entry.valueMode === "balance8h" ? ` • saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : "";
         const paymentLabel = entry.status === "paid"
@@ -1323,7 +1333,7 @@
       const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"}`);
       return `*${name}*\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*`;
     });
-    return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\nJornadas pagas: ${currency.format(paid)}\nSaldo não pago após vales: ${currency.format(pendingGross - advancesTotal)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
+    return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\nJornadas pagas: ${currency.format(paid)}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
   }
 
   function buildPrintableReport(entries, advances) {
@@ -1359,6 +1369,7 @@
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       const advanceRows = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `<tr><td>${dateBR(advance.date)}</td><td>${escapeHTML(advance.note || "Vale/adiantamento")}</td><td>− ${currency.format(advance.value)}</td></tr>`).join("");
       const netTotal = subtotal - employeeAdvancesTotal;
+      const pendingNetSubtotal = pendingSubtotal === 0 ? 0 : pendingSubtotal - employeeAdvancesTotal;
       const paymentSummary = L.summarizePayments(workItems);
       const statusLabel = workItems.length
         ? paymentStatusText(paymentSummary)
@@ -1389,7 +1400,7 @@
           <div><span>Vales</span><strong>− ${currency.format(employeeAdvancesTotal)}</strong></div>
           <div class="payslip-net"><span>Valor líquido</span><strong>${currency.format(netTotal)}</strong></div>
         </div>
-        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Jornadas não pagas: <strong>${currency.format(pendingSubtotal)}</strong></span></div>
+        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSubtotal)}</strong></span></div>
         <div class="payslip-receipt">
           <p>Declaro que conferi as jornadas, as faltas, os vales e os valores acima referentes ao período informado.</p>
           <p class="payslip-date-line">Tangará da Serra, ______ de ____________________ de __________.</p>
