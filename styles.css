@@ -285,23 +285,47 @@ td.negative-text { color: var(--danger) !important; }
 .dialog::backdrop { background: rgba(10, 19, 32, .62); backdrop-filter: blur(3px); }
 .dialog-header { position: sticky; z-index: 2; top: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid var(--line); background: #fff; }
 .dialog-header h2 { margin: 4px 0 0; font-size: 1.25rem; }
-.employee-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 20px 22px 13px; }
-.employee-form .grow { flex: 1 1 230px; min-width: 0; }
-.payment-type-field { flex: 0 1 165px; }
-.pay-schedule-field { flex: 1 1 220px; }
-.rate-field { flex: 0 0 155px; }
-.monthly-payment-fields { display: grid; flex: 1 1 340px; grid-template-columns: minmax(180px, 1fr) minmax(130px, .6fr); align-items: end; gap: 10px; }
+.employees-dialog { width: min(1080px, calc(100% - 28px)); }
+.employee-form { display: grid; gap: 14px; padding: 20px 22px 13px; }
+.employee-form-section { min-width: 0; padding: 16px; border: 1px solid #e0e5ec; border-radius: 13px; background: #f9fafc; }
+.employee-form-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
+.employee-form-section-heading h3 { margin: 0; font-size: .95rem; }
+.employee-form-section-heading p { margin: 3px 0 0; color: #737e90; font-size: .72rem; }
+.employee-form-section-heading > span { flex: 0 0 auto; padding: 4px 7px; border-radius: 999px; background: #fff2b8; color: #6b5200; font-size: .62rem; font-weight: 850; }
+.employee-profile-grid, .employee-payment-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 11px; }
+.employee-profile-grid.three-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.employee-profile-grid .span-2 { grid-column: span 2; }
+.employee-profile-grid .state-field { max-width: 110px; }
+.monthly-payment-fields { display: grid; grid-column: span 2; grid-template-columns: minmax(180px, 1fr) minmax(130px, .6fr); align-items: end; gap: 10px; }
 .monthly-payment-fields[hidden] { display: none; }
+.employee-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .employees-list { padding: 8px 22px 22px; }
 .employee-item { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 12px 0; border-bottom: 1px solid #e8ebf0; }
 .employee-item:last-child { border-bottom: 0; }
 .employee-info { min-width: 0; }
 .employee-info strong { display: block; overflow: hidden; font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
-.employee-info small { color: #778195; font-size: .7rem; }
+.employee-info small { display: block; margin-top: 3px; color: #778195; font-size: .7rem; }
 .employee-info small.employee-pay-schedule, .group-person small.employee-pay-schedule { display: block; margin-top: 4px; color: #5c6679; font-weight: 750; }
 .employee-actions { display: flex; gap: 6px; }
 .employees-list .empty-mini { padding: 28px; color: #7a8495; font-size: .82rem; text-align: center; }
 .employees-dialog > .form-error { margin: 0 22px 8px; }
+.employee-profile-dialog { width: min(920px, calc(100% - 28px)); }
+.profile-private-note { display: flex; align-items: flex-start; gap: 12px; margin: 18px 22px 0; padding: 13px 15px; border: 1px solid #f0d774; border-radius: 11px; background: #fff9df; }
+.profile-private-note strong { flex: 0 0 auto; color: #715600; font-size: .78rem; }
+.profile-private-note span { color: #6e6340; font-size: .76rem; line-height: 1.45; }
+.employee-profile-content { display: grid; gap: 14px; padding: 18px 22px; }
+.profile-card { padding: 15px; border: 1px solid #e0e5ec; border-radius: 12px; background: #f9fafc; }
+.profile-card h3 { margin: 0 0 11px; color: #243451; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+.profile-data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.profile-data-item { min-width: 0; padding: 9px 10px; border-radius: 8px; background: #fff; }
+.profile-data-item.wide { grid-column: span 2; }
+.profile-data-item span { display: block; margin-bottom: 3px; color: #778195; font-size: .66rem; font-weight: 750; text-transform: uppercase; }
+.profile-data-item strong { display: block; overflow-wrap: anywhere; color: #17253c; font-size: .82rem; }
+.profile-empty { color: #8992a1 !important; font-style: italic; font-weight: 600 !important; }
+.employee-profile-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 0 22px 22px; }
+.employee-profile-status { display: inline-flex; margin-top: 5px; padding: 3px 7px; border-radius: 999px; background: #fff2b8; color: #6b5200; font-size: .63rem; font-weight: 850; }
+.employee-profile-status.complete { background: #def5e9; color: #176647; }
+.backup-sensitive-note { margin: 0 22px 14px; padding: 11px 13px; border: 1px solid #f0d774; border-radius: 10px; background: #fff9df; color: #665b38; font-size: .76rem; line-height: 1.45; }
 .rate-form { display: grid; grid-template-columns: 1fr 1fr auto auto; align-items: end; gap: 10px; padding: 6px 22px 13px; }
 .rate-error { margin: 0 22px 8px; }
 .rates-list { padding: 8px 22px 22px; }
@@ -538,10 +562,11 @@ td { padding: 13px; font-size: .9rem; }
   .group-totals { width: 100%; justify-content: space-between; text-align: left; }
   .group-payment-actions .mini-btn { min-height: 44px; }
   .group-totals { gap: 8px; }
-  .employee-form { display: grid; grid-template-columns: 1fr 1fr; }
-  .employee-form .grow { grid-column: 1 / -1; }
+  .employee-profile-grid, .employee-profile-grid.three-columns, .employee-payment-grid { grid-template-columns: 1fr 1fr; }
+  .employee-profile-grid .span-2 { grid-column: span 2; }
+  .employee-profile-grid .state-field { max-width: none; }
   .monthly-payment-fields { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
-  .rate-field { width: auto; }
+  .profile-data-grid { grid-template-columns: 1fr 1fr; }
   .payslip-header { align-items: flex-start; flex-direction: column; gap: 11px; }
   .payslip-heading { text-align: left; }
   .payslip-meta, .payslip-totals { grid-template-columns: repeat(2, 1fr); }
@@ -577,13 +602,21 @@ td { padding: 13px; font-size: .9rem; }
   .section-heading.compact { align-items: flex-start; }
   .section-heading.compact .btn { padding-inline: 10px; }
   .calc-preview strong { font-size: .87rem; }
-  .employee-form { grid-template-columns: 1fr; }
-  .employee-form .grow { grid-column: auto; }
-  .monthly-payment-fields { grid-column: auto; grid-template-columns: 1fr; }
-  .employee-form .btn { width: 100%; }
+  .employee-form { gap: 11px; padding-inline: 12px; }
+  .employee-form-section { padding: 13px; }
+  .employee-form-section-heading { flex-direction: column; gap: 7px; }
+  .employee-profile-grid, .employee-profile-grid.three-columns, .employee-payment-grid, .monthly-payment-fields, .profile-data-grid { grid-template-columns: 1fr; }
+  .employee-profile-grid .span-2, .profile-data-item.wide, .monthly-payment-fields { grid-column: auto; }
+  .employee-form-actions, .employee-profile-actions { flex-direction: column; }
+  .employee-form-actions .btn, .employee-profile-actions .btn { width: 100%; }
+  .profile-private-note { flex-direction: column; margin-inline: 12px; }
+  .employee-profile-content { padding-inline: 12px; }
+  .employee-profile-actions { padding-inline: 12px; }
   .group-payment-actions { display: grid; grid-template-columns: 1fr; }
   .group-payment-actions .mini-btn { width: 100%; }
-  .employee-item { align-items: flex-start; }
+  .employee-item { align-items: flex-start; flex-direction: column; }
+  .employee-actions { width: 100%; flex-wrap: wrap; }
+  .employee-actions .mini-btn { flex: 1 1 auto; }
   .rate-form { grid-template-columns: 1fr; }
   .rate-item { align-items: flex-start; }
   .advance-form { grid-template-columns: 1fr; }

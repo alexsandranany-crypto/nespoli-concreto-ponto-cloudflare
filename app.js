@@ -16,10 +16,11 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 6, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 7, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = "close20";
   let activeRateEmployeeId = null;
+  let activeProfileEmployeeId = null;
   let activeBulkPaymentEntryIds = [];
   let toastTimer;
   let cloudRevision = 0;
@@ -46,8 +47,15 @@
     employeesDialog: $("#employeesDialog"), employeeForm: $("#employeeForm"), employeeId: $("#employeeId"), employeeName: $("#employeeName"),
     employeeRate: $("#employeeRate"), employeeRateField: $("#employeeRateField"), employeePaymentType: $("#employeePaymentType"),
     employeePaySchedule: $("#employeePaySchedule"),
+    employeePhone: $("#employeePhone"), employeeBirthDate: $("#employeeBirthDate"), employeeCpf: $("#employeeCpf"), employeeRg: $("#employeeRg"), employeePis: $("#employeePis"),
+    employeeJobTitle: $("#employeeJobTitle"), employeeHireDate: $("#employeeHireDate"), employeeEmploymentStatus: $("#employeeEmploymentStatus"),
+    employeeZipCode: $("#employeeZipCode"), employeeStreet: $("#employeeStreet"), employeeAddressNumber: $("#employeeAddressNumber"), employeeComplement: $("#employeeComplement"),
+    employeeNeighborhood: $("#employeeNeighborhood"), employeeCity: $("#employeeCity"), employeeState: $("#employeeState"),
+    employeeBankName: $("#employeeBankName"), employeeBankAgency: $("#employeeBankAgency"), employeeBankAccount: $("#employeeBankAccount"),
+    employeeBankAccountType: $("#employeeBankAccountType"), employeePixKey: $("#employeePixKey"), employeeBankHolder: $("#employeeBankHolder"),
     employeeMonthlyFields: $("#employeeMonthlyFields"), employeeMonthlySalary: $("#employeeMonthlySalary"), employeeMonthlyHours: $("#employeeMonthlyHours"),
     employeeError: $("#employeeError"), employeesList: $("#employeesList"), saveEmployeeBtn: $("#saveEmployeeBtn"),
+    employeeProfileDialog: $("#employeeProfileDialog"), employeeProfileName: $("#employeeProfileName"), employeeProfileContent: $("#employeeProfileContent"), editEmployeeProfileBtn: $("#editEmployeeProfileBtn"),
     cancelEmployeeEditBtn: $("#cancelEmployeeEditBtn"), backupDialog: $("#backupDialog"), backupFile: $("#backupFile"), backupMeta: $("#backupMeta"),
     backupText: $("#backupText"),
     reportDialog: $("#reportDialog"), reportEmployeeSelect: $("#reportEmployeeSelect"), reportSelectionSummary: $("#reportSelectionSummary"),
@@ -94,8 +102,67 @@
     return defaultState();
   }
 
+  function textValue(value) { return String(value ?? "").trim(); }
+  function onlyDigits(value) { return textValue(value).replace(/\D/g, ""); }
+  function formatCPF(value) {
+    const digits = onlyDigits(value).slice(0, 11);
+    return digits.length === 11 ? digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : textValue(value);
+  }
+  function formatCEP(value) {
+    const digits = onlyDigits(value).slice(0, 8);
+    return digits.length === 8 ? digits.replace(/(\d{5})(\d{3})/, "$1-$2") : textValue(value);
+  }
+  function formatPhone(value) {
+    const digits = onlyDigits(value).slice(0, 11);
+    if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    if (digits.length === 10) return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+    return textValue(value);
+  }
+  function normalizeEmployeeProfile(employee = {}) {
+    const profile = employee.profile && typeof employee.profile === "object" ? employee.profile : {};
+    const address = profile.address && typeof profile.address === "object" ? profile.address : {};
+    const bank = profile.bank && typeof profile.bank === "object" ? profile.bank : {};
+    const employment = profile.employment && typeof profile.employment === "object" ? profile.employment : {};
+    return {
+      phone: textValue(profile.phone ?? employee.phone),
+      birthDate: textValue(profile.birthDate ?? employee.birthDate),
+      cpf: textValue(profile.cpf ?? employee.cpf),
+      rg: textValue(profile.rg ?? employee.rg),
+      pis: textValue(profile.pis ?? employee.pis),
+      employment: {
+        jobTitle: textValue(employment.jobTitle ?? employee.jobTitle),
+        hireDate: textValue(employment.hireDate ?? employee.hireDate),
+        status: (employment.status ?? employee.employmentStatus) === "inactive" ? "inactive" : "active"
+      },
+      address: {
+        zipCode: textValue(address.zipCode ?? employee.zipCode),
+        street: textValue(address.street ?? employee.street),
+        number: textValue(address.number ?? employee.addressNumber),
+        complement: textValue(address.complement ?? employee.complement),
+        neighborhood: textValue(address.neighborhood ?? employee.neighborhood),
+        city: textValue(address.city ?? employee.city),
+        state: textValue(address.state ?? employee.state).toUpperCase().slice(0, 2)
+      },
+      bank: {
+        name: textValue(bank.name ?? employee.bankName),
+        agency: textValue(bank.agency ?? employee.bankAgency),
+        account: textValue(bank.account ?? employee.bankAccount),
+        accountType: ["checking", "savings", "salary", "payment", "other"].includes(bank.accountType) ? bank.accountType : "",
+        pixKey: textValue(bank.pixKey ?? employee.pixKey),
+        holder: textValue(bank.holder ?? employee.bankHolder)
+      }
+    };
+  }
+  function isEmployeeProfileComplete(employee) {
+    const profile = normalizeEmployeeProfile(employee);
+    return Boolean(profile.phone && profile.birthDate && onlyDigits(profile.cpf).length === 11 && profile.employment.jobTitle && profile.employment.hireDate && profile.address.street && profile.address.city && profile.address.state && profile.bank.name && (profile.bank.account || profile.bank.pixKey));
+  }
+  function bankAccountTypeLabel(value) {
+    return ({ checking: "Conta corrente", savings: "Conta poupança", salary: "Conta salário", payment: "Conta de pagamento", other: "Outra" })[value] || "Não informado";
+  }
+
   function normalizeState(data) {
-    data.version = 6;
+    data.version = 7;
     data.advances = Array.isArray(data.advances) ? data.advances : [];
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
@@ -111,6 +178,7 @@
         ...employee,
         paymentType,
         paySchedule: employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period",
+        profile: normalizeEmployeeProfile(employee),
         dailyRate: normalizedHistory.at(-1)?.dailyRate || Number(employee.dailyRate) || 0,
         rateHistory: normalizedHistory,
         monthlySalary: L.roundMoney(Number(employee.monthlySalary) || 0),
@@ -313,6 +381,11 @@
     dom.employeeForm.addEventListener("submit", saveEmployee);
     dom.employeePaymentType.addEventListener("change", updateEmployeePaymentFields);
     dom.cancelEmployeeEditBtn.addEventListener("click", resetEmployeeForm);
+    dom.editEmployeeProfileBtn.addEventListener("click", editEmployeeFromProfile);
+    dom.employeeCpf.addEventListener("blur", () => { dom.employeeCpf.value = formatCPF(dom.employeeCpf.value); });
+    dom.employeeZipCode.addEventListener("blur", () => { dom.employeeZipCode.value = formatCEP(dom.employeeZipCode.value); });
+    dom.employeePhone.addEventListener("blur", () => { dom.employeePhone.value = formatPhone(dom.employeePhone.value); });
+    dom.employeeState.addEventListener("input", () => { dom.employeeState.value = dom.employeeState.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2); });
     dom.rateForm.addEventListener("submit", saveRate);
     dom.cancelRateEditBtn.addEventListener("click", resetRateForm);
     dom.ratesList.addEventListener("click", handleRateAction);
@@ -343,6 +416,44 @@
 
   function getEmployee(id) { return state.employees.find((employee) => employee.id === id); }
 
+  function populateEmployeeForm(employee) {
+    const profile = normalizeEmployeeProfile(employee);
+    dom.employeeId.value = employee.id;
+    dom.employeeName.value = employee.name;
+    dom.employeePhone.value = profile.phone;
+    dom.employeeBirthDate.value = profile.birthDate;
+    dom.employeeCpf.value = profile.cpf;
+    dom.employeeRg.value = profile.rg;
+    dom.employeePis.value = profile.pis;
+    dom.employeeJobTitle.value = profile.employment.jobTitle;
+    dom.employeeHireDate.value = profile.employment.hireDate;
+    dom.employeeEmploymentStatus.value = profile.employment.status;
+    dom.employeeZipCode.value = profile.address.zipCode;
+    dom.employeeStreet.value = profile.address.street;
+    dom.employeeAddressNumber.value = profile.address.number;
+    dom.employeeComplement.value = profile.address.complement;
+    dom.employeeNeighborhood.value = profile.address.neighborhood;
+    dom.employeeCity.value = profile.address.city;
+    dom.employeeState.value = profile.address.state;
+    dom.employeeBankName.value = profile.bank.name;
+    dom.employeeBankAgency.value = profile.bank.agency;
+    dom.employeeBankAccount.value = profile.bank.account;
+    dom.employeeBankAccountType.value = profile.bank.accountType;
+    dom.employeePixKey.value = profile.bank.pixKey;
+    dom.employeeBankHolder.value = profile.bank.holder;
+    dom.employeePaymentType.value = employee.paymentType === "monthly" ? "monthly" : "daily";
+    dom.employeePaySchedule.value = employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
+    dom.employeeRate.value = employee.dailyRate ? Number(employee.dailyRate).toFixed(2) : "";
+    dom.employeeMonthlySalary.value = employee.monthlySalary ? Number(employee.monthlySalary).toFixed(2) : "";
+    dom.employeeMonthlyHours.value = Number(employee.monthlyHours) || 220;
+    updateEmployeePaymentFields();
+    dom.saveEmployeeBtn.textContent = "Salvar cadastro";
+    dom.cancelEmployeeEditBtn.hidden = false;
+    hideError(dom.employeeError);
+    dom.employeeForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => dom.employeeName.focus(), 50);
+  }
+
   function saveEmployee(event) {
     event.preventDefault();
     hideError(dom.employeeError);
@@ -352,13 +463,47 @@
     const monthlySalary = Number(dom.employeeMonthlySalary.value);
     const monthlyHours = Number(dom.employeeMonthlyHours.value);
     const paySchedule = dom.employeePaySchedule.value === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
+    const profile = {
+      phone: formatPhone(dom.employeePhone.value),
+      birthDate: textValue(dom.employeeBirthDate.value),
+      cpf: formatCPF(dom.employeeCpf.value),
+      rg: textValue(dom.employeeRg.value),
+      pis: textValue(dom.employeePis.value),
+      employment: {
+        jobTitle: textValue(dom.employeeJobTitle.value),
+        hireDate: textValue(dom.employeeHireDate.value),
+        status: dom.employeeEmploymentStatus.value === "inactive" ? "inactive" : "active"
+      },
+      address: {
+        zipCode: formatCEP(dom.employeeZipCode.value),
+        street: textValue(dom.employeeStreet.value),
+        number: textValue(dom.employeeAddressNumber.value),
+        complement: textValue(dom.employeeComplement.value),
+        neighborhood: textValue(dom.employeeNeighborhood.value),
+        city: textValue(dom.employeeCity.value),
+        state: textValue(dom.employeeState.value).toUpperCase().slice(0, 2)
+      },
+      bank: {
+        name: textValue(dom.employeeBankName.value),
+        agency: textValue(dom.employeeBankAgency.value),
+        account: textValue(dom.employeeBankAccount.value),
+        accountType: dom.employeeBankAccountType.value,
+        pixKey: textValue(dom.employeePixKey.value),
+        holder: textValue(dom.employeeBankHolder.value)
+      }
+    };
     const editing = Boolean(dom.employeeId.value);
     if (!name) return showError(dom.employeeError, "Informe o nome do colaborador.");
     if (paymentType === "daily" && (!Number.isFinite(rate) || rate <= 0)) return showError(dom.employeeError, "Informe uma diária válida.");
     if (paymentType === "monthly" && (!Number.isFinite(monthlySalary) || monthlySalary <= 0)) return showError(dom.employeeError, "Informe um salário mensal válido.");
     if (paymentType === "monthly" && (!Number.isFinite(monthlyHours) || monthlyHours <= 0)) return showError(dom.employeeError, "Informe as horas mensais para o cálculo.");
+    if (profile.birthDate && profile.birthDate > todayISO()) return showError(dom.employeeError, "A data de nascimento não pode estar no futuro.");
+    if (profile.cpf && onlyDigits(profile.cpf).length !== 11) return showError(dom.employeeError, "Confira o CPF. Ele precisa ter 11 números.");
+    if (profile.address.zipCode && onlyDigits(profile.address.zipCode).length !== 8) return showError(dom.employeeError, "Confira o CEP. Ele precisa ter 8 números.");
     const duplicate = state.employees.find((employee) => employee.name.toLocaleLowerCase("pt-BR") === name.toLocaleLowerCase("pt-BR") && employee.id !== dom.employeeId.value);
     if (duplicate) return showError(dom.employeeError, "Já existe um colaborador com este nome.");
+    const duplicateCpf = profile.cpf && state.employees.find((employee) => onlyDigits(employee.profile?.cpf) === onlyDigits(profile.cpf) && employee.id !== dom.employeeId.value);
+    if (duplicateCpf) return showError(dom.employeeError, `Este CPF já está cadastrado para ${duplicateCpf.name}.`);
 
     if (editing) {
       const employee = getEmployee(dom.employeeId.value);
@@ -373,6 +518,7 @@
           name,
           paymentType,
           paySchedule,
+          profile,
           monthlySalary: paymentType === "monthly" ? L.roundMoney(monthlySalary) : Number(employee.monthlySalary) || 0,
           monthlyHours: paymentType === "monthly" ? monthlyHours : Number(employee.monthlyHours) || 220,
           updatedAt: new Date().toISOString()
@@ -386,6 +532,7 @@
         name,
         paymentType,
         paySchedule,
+        profile,
         dailyRate,
         rateHistory: paymentType === "daily" ? [{ id: uid(), startDate: "0000-01-01", dailyRate }] : [],
         monthlySalary: paymentType === "monthly" ? L.roundMoney(monthlySalary) : 0,
@@ -407,6 +554,10 @@
     if (!button) return;
     const employee = getEmployee(button.dataset.id);
     if (!employee) return;
+    if (button.dataset.employeeAction === "profile") {
+      openEmployeeProfile(employee.id);
+      return;
+    }
     if (button.dataset.employeeAction === "rates") {
       if (employee.paymentType === "monthly") return toast("Mensalista usa salário mensal e horas do mês.");
       dom.employeesDialog.close();
@@ -414,17 +565,7 @@
       return;
     }
     if (button.dataset.employeeAction === "edit") {
-      dom.employeeId.value = employee.id;
-      dom.employeeName.value = employee.name;
-      dom.employeePaymentType.value = employee.paymentType === "monthly" ? "monthly" : "daily";
-      dom.employeePaySchedule.value = employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
-      dom.employeeRate.value = employee.dailyRate ? Number(employee.dailyRate).toFixed(2) : "";
-      dom.employeeMonthlySalary.value = employee.monthlySalary ? Number(employee.monthlySalary).toFixed(2) : "";
-      dom.employeeMonthlyHours.value = Number(employee.monthlyHours) || 220;
-      updateEmployeePaymentFields();
-      dom.saveEmployeeBtn.textContent = "Salvar alterações";
-      dom.cancelEmployeeEditBtn.hidden = false;
-      dom.employeeName.focus();
+      populateEmployeeForm(employee);
       return;
     }
     const linked = state.entries.filter((entry) => entry.employeeId === employee.id).length;
@@ -443,6 +584,70 @@
     toast("Colaborador excluído.");
   }
 
+  function profileDataItem(label, value, wide = false) {
+    const content = textValue(value);
+    return `<div class="profile-data-item${wide ? " wide" : ""}"><span>${escapeHTML(label)}</span><strong class="${content ? "" : "profile-empty"}">${escapeHTML(content || "Não informado")}</strong></div>`;
+  }
+
+  function openEmployeeProfile(employeeId) {
+    const employee = getEmployee(employeeId);
+    if (!employee) return;
+    const profile = normalizeEmployeeProfile(employee);
+    const payment = currentPaymentConfig(employee, todayISO());
+    const paymentLabel = payment.paymentType === "monthly"
+      ? `Mensalista • ${currency.format(payment.monthlySalary)} • ${payment.monthlyHours}h/mês`
+      : `Por diária • ${currency.format(payment.dailyRate)} • ${currency.format(payment.dailyRate / 8)}/h`;
+    activeProfileEmployeeId = employee.id;
+    dom.employeeProfileName.textContent = employee.name;
+    dom.employeeProfileContent.innerHTML = `
+      <section class="profile-card"><h3>Dados pessoais</h3><div class="profile-data-grid">
+        ${profileDataItem("Nome completo", employee.name, true)}
+        ${profileDataItem("Contato / WhatsApp", profile.phone)}
+        ${profileDataItem("Data de nascimento", profile.birthDate ? dateBR(profile.birthDate) : "")}
+      </div></section>
+      <section class="profile-card"><h3>Dados profissionais</h3><div class="profile-data-grid">
+        ${profileDataItem("Função / cargo", profile.employment.jobTitle, true)}
+        ${profileDataItem("Data de admissão / início", profile.employment.hireDate ? dateBR(profile.employment.hireDate) : "")}
+        ${profileDataItem("Situação", profile.employment.status === "inactive" ? "Inativo" : "Ativo")}
+      </div></section>
+      <section class="profile-card"><h3>Documentos</h3><div class="profile-data-grid">
+        ${profileDataItem("CPF", profile.cpf)}
+        ${profileDataItem("RG", profile.rg)}
+        ${profileDataItem("PIS / NIS", profile.pis)}
+      </div></section>
+      <section class="profile-card"><h3>Endereço</h3><div class="profile-data-grid">
+        ${profileDataItem("CEP", profile.address.zipCode)}
+        ${profileDataItem("Rua / Avenida", profile.address.street, true)}
+        ${profileDataItem("Número", profile.address.number)}
+        ${profileDataItem("Complemento", profile.address.complement, true)}
+        ${profileDataItem("Bairro", profile.address.neighborhood)}
+        ${profileDataItem("Cidade", profile.address.city)}
+        ${profileDataItem("UF", profile.address.state)}
+      </div></section>
+      <section class="profile-card"><h3>Conta bancária</h3><div class="profile-data-grid">
+        ${profileDataItem("Banco", profile.bank.name, true)}
+        ${profileDataItem("Agência", profile.bank.agency)}
+        ${profileDataItem("Conta", profile.bank.account)}
+        ${profileDataItem("Tipo de conta", profile.bank.accountType ? bankAccountTypeLabel(profile.bank.accountType) : "")}
+        ${profileDataItem("Chave Pix", profile.bank.pixKey, true)}
+        ${profileDataItem("Titular da conta", profile.bank.holder, true)}
+      </div></section>
+      <section class="profile-card"><h3>Pagamento</h3><div class="profile-data-grid">
+        ${profileDataItem("Forma de cálculo", paymentLabel, true)}
+        ${profileDataItem("Quando pagar", paymentScheduleLabel(employee, state.entries.filter((entry) => entry.employeeId === employee.id)), true)}
+      </div></section>`;
+    if (dom.employeesDialog.open) dom.employeesDialog.close();
+    dom.employeeProfileDialog.showModal();
+  }
+
+  function editEmployeeFromProfile() {
+    const employee = getEmployee(activeProfileEmployeeId);
+    if (!employee) return;
+    dom.employeeProfileDialog.close();
+    openEmployees();
+    populateEmployeeForm(employee);
+  }
+
   function resetEmployeeForm() {
     dom.employeeForm.reset();
     dom.employeeId.value = "";
@@ -450,7 +655,7 @@
     dom.employeePaySchedule.value = "period";
     dom.employeeMonthlyHours.value = "220";
     updateEmployeePaymentFields();
-    dom.saveEmployeeBtn.textContent = "Adicionar";
+    dom.saveEmployeeBtn.textContent = "Adicionar colaborador";
     dom.cancelEmployeeEditBtn.hidden = true;
     hideError(dom.employeeError);
   }
@@ -1095,9 +1300,14 @@
         ? `Mensalista • ${currency.format(config.monthlySalary)} • ${config.monthlyHours}h/mês`
         : `${currency.format(config.dailyRate)} vigente • ${employee.rateHistory.length} diária(s) no histórico`;
       const schedule = paymentScheduleLabel(employee, employeeEntries);
+      const profile = normalizeEmployeeProfile(employee);
+      const profileComplete = isEmployeeProfileComplete(employee);
+      const contactSummary = [profile.phone, profile.address.city && profile.address.state ? `${profile.address.city}/${profile.address.state}` : profile.address.city].filter(Boolean).join(" • ");
+      const professionalSummary = [profile.employment.jobTitle, profile.employment.status === "inactive" ? "Inativo" : "Ativo"].filter(Boolean).join(" • ");
       return `<div class="employee-item">
-        <div class="employee-info"><strong>${escapeHTML(employee.name)}</strong><small>${summary} • ${journeyCount} jornada(s) • ${absenceCount} falta(s)</small><small class="employee-pay-schedule">${escapeHTML(schedule)}</small></div>
+        <div class="employee-info"><strong>${escapeHTML(employee.name)}</strong><small>${summary} • ${journeyCount} jornada(s) • ${absenceCount} falta(s)</small><small>${escapeHTML(professionalSummary)}</small>${contactSummary ? `<small>${escapeHTML(contactSummary)}</small>` : ""}<small class="employee-pay-schedule">${escapeHTML(schedule)}</small><span class="employee-profile-status${profileComplete ? " complete" : ""}">${profileComplete ? "Ficha preenchida" : "Completar cadastro"}</span></div>
         <div class="employee-actions">
+          <button class="mini-btn" data-employee-action="profile" data-id="${employee.id}" type="button">Ficha</button>
           ${config.paymentType === "daily" ? `<button class="mini-btn rate" data-employee-action="rates" data-id="${employee.id}" type="button">Diárias</button>` : ""}
           <button class="mini-btn" data-employee-action="edit" data-id="${employee.id}" type="button">Editar</button>
           <button class="mini-btn delete" data-employee-action="delete" data-id="${employee.id}" type="button">Excluir</button>
@@ -1497,7 +1707,7 @@
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 6, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 7, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
@@ -1529,7 +1739,7 @@
     const data = parsed?.data || parsed;
     if (!Array.isArray(data?.employees) || !Array.isArray(data?.entries)) throw new Error("Formato inválido");
     if (!confirm(`Restaurar este backup com ${data.employees.length} colaborador(es), ${data.entries.length} registro(s) de jornada/falta e ${(data.advances || []).length} vale(s)? Os dados atuais serão substituídos.`)) return false;
-    state = normalizeState({ version: 5, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
+    state = normalizeState({ version: 7, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
     saveState();
     resetEntryForm();
     renderAll();

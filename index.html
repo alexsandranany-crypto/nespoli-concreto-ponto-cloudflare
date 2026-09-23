@@ -253,43 +253,188 @@
     </div>
     <form id="employeeForm" class="employee-form">
       <input id="employeeId" type="hidden">
-      <div class="field grow">
-        <label for="employeeName">Nome</label>
-        <input id="employeeName" type="text" maxlength="80" placeholder="Nome do colaborador" required>
-      </div>
-      <div class="field payment-type-field">
-        <label for="employeePaymentType">Pagamento</label>
-        <select id="employeePaymentType">
-          <option value="daily">Por diária</option>
-          <option value="monthly">Mensalista</option>
-        </select>
-      </div>
-      <div class="field rate-field" id="employeeRateField">
-        <label for="employeeRate">Diária</label>
-        <div class="currency-input"><span>R$</span><input id="employeeRate" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="150,00" required></div>
-      </div>
-      <div class="monthly-payment-fields" id="employeeMonthlyFields" hidden>
-        <div class="field">
-          <label for="employeeMonthlySalary">Salário mensal</label>
-          <div class="currency-input"><span>R$</span><input id="employeeMonthlySalary" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="2.200,00"></div>
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Dados pessoais</h3><p>Identificação e contato do colaborador</p></div><span>Nome obrigatório</span></div>
+        <div class="employee-profile-grid">
+          <div class="field span-2">
+            <label for="employeeName">Nome completo</label>
+            <input id="employeeName" type="text" maxlength="100" autocomplete="name" placeholder="Nome completo do colaborador" required>
+          </div>
+          <div class="field">
+            <label for="employeePhone">Contato / WhatsApp</label>
+            <input id="employeePhone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="(65) 99999-9999">
+          </div>
+          <div class="field">
+            <label for="employeeBirthDate">Data de nascimento</label>
+            <input id="employeeBirthDate" type="date" autocomplete="bday">
+          </div>
         </div>
-        <div class="field">
-          <label for="employeeMonthlyHours">Horas por mês</label>
-          <input id="employeeMonthlyHours" type="number" min="1" step="1" inputmode="numeric" value="220">
+      </section>
+
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Dados profissionais</h3><p>Função, admissão e situação do colaborador</p></div></div>
+        <div class="employee-profile-grid three-columns">
+          <div class="field">
+            <label for="employeeJobTitle">Função / cargo</label>
+            <input id="employeeJobTitle" type="text" maxlength="80" placeholder="Ex.: Auxiliar de produção">
+          </div>
+          <div class="field">
+            <label for="employeeHireDate">Data de admissão / início</label>
+            <input id="employeeHireDate" type="date">
+          </div>
+          <div class="field">
+            <label for="employeeEmploymentStatus">Situação</label>
+            <select id="employeeEmploymentStatus">
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+            </select>
+          </div>
         </div>
+      </section>
+
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Documentos</h3><p>Números para a ficha cadastral</p></div><span>Dados privados</span></div>
+        <div class="employee-profile-grid three-columns">
+          <div class="field">
+            <label for="employeeCpf">CPF</label>
+            <input id="employeeCpf" type="text" maxlength="14" inputmode="numeric" placeholder="000.000.000-00">
+          </div>
+          <div class="field">
+            <label for="employeeRg">RG</label>
+            <input id="employeeRg" type="text" maxlength="30" placeholder="Número e órgão emissor">
+          </div>
+          <div class="field">
+            <label for="employeePis">PIS / NIS</label>
+            <input id="employeePis" type="text" maxlength="20" inputmode="numeric" placeholder="Número do PIS/NIS">
+          </div>
+        </div>
+      </section>
+
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Endereço</h3><p>Localização atual do colaborador</p></div></div>
+        <div class="employee-profile-grid address-grid">
+          <div class="field">
+            <label for="employeeZipCode">CEP</label>
+            <input id="employeeZipCode" type="text" maxlength="9" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000">
+          </div>
+          <div class="field span-2">
+            <label for="employeeStreet">Rua / Avenida</label>
+            <input id="employeeStreet" type="text" maxlength="120" autocomplete="street-address" placeholder="Nome da rua ou avenida">
+          </div>
+          <div class="field">
+            <label for="employeeAddressNumber">Número</label>
+            <input id="employeeAddressNumber" type="text" maxlength="15" placeholder="Nº ou S/N">
+          </div>
+          <div class="field span-2">
+            <label for="employeeComplement">Complemento</label>
+            <input id="employeeComplement" type="text" maxlength="80" placeholder="Casa, apartamento ou referência">
+          </div>
+          <div class="field">
+            <label for="employeeNeighborhood">Bairro</label>
+            <input id="employeeNeighborhood" type="text" maxlength="80" placeholder="Bairro">
+          </div>
+          <div class="field">
+            <label for="employeeCity">Cidade</label>
+            <input id="employeeCity" type="text" maxlength="80" autocomplete="address-level2" placeholder="Cidade">
+          </div>
+          <div class="field state-field">
+            <label for="employeeState">UF</label>
+            <input id="employeeState" type="text" maxlength="2" autocomplete="address-level1" placeholder="MT">
+          </div>
+        </div>
+      </section>
+
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Conta bancária</h3><p>Dados utilizados para realizar o pagamento</p></div><span>Dados privados</span></div>
+        <div class="employee-profile-grid bank-grid">
+          <div class="field span-2">
+            <label for="employeeBankName">Banco</label>
+            <input id="employeeBankName" type="text" maxlength="80" placeholder="Nome ou número do banco">
+          </div>
+          <div class="field">
+            <label for="employeeBankAgency">Agência</label>
+            <input id="employeeBankAgency" type="text" maxlength="20" inputmode="numeric" placeholder="Agência">
+          </div>
+          <div class="field">
+            <label for="employeeBankAccount">Conta</label>
+            <input id="employeeBankAccount" type="text" maxlength="30" inputmode="numeric" placeholder="Conta e dígito">
+          </div>
+          <div class="field">
+            <label for="employeeBankAccountType">Tipo de conta</label>
+            <select id="employeeBankAccountType">
+              <option value="">Selecione</option>
+              <option value="checking">Conta corrente</option>
+              <option value="savings">Conta poupança</option>
+              <option value="salary">Conta salário</option>
+              <option value="payment">Conta de pagamento</option>
+              <option value="other">Outra</option>
+            </select>
+          </div>
+          <div class="field span-2">
+            <label for="employeePixKey">Chave Pix</label>
+            <input id="employeePixKey" type="text" maxlength="120" placeholder="CPF, telefone, e-mail ou chave aleatória">
+          </div>
+          <div class="field span-2">
+            <label for="employeeBankHolder">Titular da conta</label>
+            <input id="employeeBankHolder" type="text" maxlength="100" placeholder="Nome do titular">
+          </div>
+        </div>
+      </section>
+
+      <section class="employee-form-section">
+        <div class="employee-form-section-heading"><div><h3>Pagamento</h3><p>Forma de cálculo e vencimento</p></div></div>
+        <div class="employee-payment-grid">
+          <div class="field payment-type-field">
+            <label for="employeePaymentType">Forma de calcular</label>
+            <select id="employeePaymentType">
+              <option value="daily">Por diária</option>
+              <option value="monthly">Mensalista</option>
+            </select>
+          </div>
+          <div class="field rate-field" id="employeeRateField">
+            <label for="employeeRate">Diária</label>
+            <div class="currency-input"><span>R$</span><input id="employeeRate" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="150,00" required></div>
+          </div>
+          <div class="monthly-payment-fields" id="employeeMonthlyFields" hidden>
+            <div class="field">
+              <label for="employeeMonthlySalary">Salário mensal</label>
+              <div class="currency-input"><span>R$</span><input id="employeeMonthlySalary" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="2.200,00"></div>
+            </div>
+            <div class="field">
+              <label for="employeeMonthlyHours">Horas por mês</label>
+              <input id="employeeMonthlyHours" type="number" min="1" step="1" inputmode="numeric" value="220">
+            </div>
+          </div>
+          <div class="field pay-schedule-field">
+            <label for="employeePaySchedule">Quando pagar</label>
+            <select id="employeePaySchedule">
+              <option value="period">Conforme o fechamento</option>
+              <option value="monthlyFifthWeekday">Mensal — 5º dia útil</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div class="employee-form-actions">
+        <button class="btn btn-primary" type="submit" id="saveEmployeeBtn">Adicionar colaborador</button>
+        <button class="btn btn-secondary" type="button" id="cancelEmployeeEditBtn" hidden>Cancelar edição</button>
       </div>
-      <div class="field pay-schedule-field">
-        <label for="employeePaySchedule">Quando pagar</label>
-        <select id="employeePaySchedule">
-          <option value="period">Conforme o fechamento</option>
-          <option value="monthlyFifthWeekday">Mensal — 5º dia útil</option>
-        </select>
-      </div>
-      <button class="btn btn-primary" type="submit" id="saveEmployeeBtn">Adicionar</button>
-      <button class="btn btn-secondary" type="button" id="cancelEmployeeEditBtn" hidden>Cancelar</button>
     </form>
     <div id="employeeError" class="form-error" role="alert" hidden></div>
     <div id="employeesList" class="employees-list"></div>
+  </dialog>
+
+  <dialog id="employeeProfileDialog" class="dialog employee-profile-dialog">
+    <div class="dialog-header">
+      <div><p class="eyebrow accent">FICHA CADASTRAL</p><h2 id="employeeProfileName">Colaborador</h2></div>
+      <button class="close-btn" data-close="employeeProfileDialog" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div class="profile-private-note"><strong>Dados privados</strong><span>Documentos, endereço e conta bancária não aparecem nos relatórios de pagamento nem no texto do WhatsApp.</span></div>
+    <div id="employeeProfileContent" class="employee-profile-content"></div>
+    <div class="employee-profile-actions">
+      <button class="btn btn-primary" id="editEmployeeProfileBtn" type="button">Editar cadastro</button>
+      <button class="btn btn-secondary" data-close="employeeProfileDialog" type="button">Fechar</button>
+    </div>
   </dialog>
 
   <dialog id="ratesDialog" class="dialog rates-dialog">
@@ -321,6 +466,7 @@
       <button class="close-btn" data-close="backupDialog" type="button" aria-label="Fechar">×</button>
     </div>
     <p class="dialog-copy">Os dados ficam salvos automaticamente neste aparelho e na nuvem privada, para uso no celular e no computador. Você também pode baixar uma cópia de segurança ou restaurar um backup antigo.</p>
+    <div class="backup-sensitive-note"><strong>Atenção:</strong> o backup inclui documentos, endereço e dados bancários dos colaboradores. Guarde o arquivo em local seguro e não o envie em grupos.</div>
     <div class="backup-actions">
       <button class="btn btn-primary" id="exportBackupBtn" type="button">Baixar arquivo do backup</button>
       <button class="btn btn-primary" id="restoreBundledBackupBtn" type="button">Carregar backup incluído</button>
