@@ -500,7 +500,7 @@
       <div><p class="eyebrow accent">VALES E ADIANTAMENTOS</p><h2>Registrar desconto</h2></div>
       <button class="close-btn" data-close="advancesDialog" type="button" aria-label="Fechar">×</button>
     </div>
-    <p class="dialog-copy">O vale será descontado do total do colaborador no período correspondente à data informada.</p>
+    <p class="dialog-copy">Vales novos ficam como “Não pago”. Ao finalizar o pagamento do colaborador, eles serão marcados automaticamente como pagos/descontados.</p>
     <form id="advanceForm" class="advance-form">
       <input id="advanceId" type="hidden">
       <div class="field">
@@ -534,7 +534,7 @@
           <small id="advanceFilterSelection">Todos os colaboradores</small>
           <span id="advanceFilterPeriod" class="advance-filter-period">Todos os períodos</span>
           <span id="advanceFilterCount">0 vales encontrados</span>
-          <b class="advance-total-label">Total dos vales</b>
+          <b class="advance-total-label" id="advanceTotalLabel">Total dos vales não pagos</b>
           <strong id="advanceFilterTotal">R$ 0,00</strong>
         </div>
       </div>
@@ -552,6 +552,14 @@
         <div class="field">
           <label for="advanceFilterEnd">Data final</label>
           <input id="advanceFilterEnd" type="date">
+        </div>
+        <div class="field">
+          <label for="advanceFilterStatus">Situação do vale</label>
+          <select id="advanceFilterStatus">
+            <option value="pending">Somente não pagos</option>
+            <option value="paid">Já pagos/descontados</option>
+            <option value="all">Todos</option>
+          </select>
         </div>
         <button class="btn btn-secondary" id="clearAdvanceFiltersBtn" type="button">Limpar filtro</button>
       </div>
@@ -601,7 +609,7 @@
       <div class="field">
         <label for="bulkPaymentDate">Data em que o pagamento foi feito</label>
         <input id="bulkPaymentDate" type="date" required>
-        <small>Esta mesma data será registrada em todas as jornadas não pagas mostradas no período selecionado.</small>
+        <small>Esta mesma data será registrada nas jornadas e nos vales não pagos mostrados no período selecionado.</small>
       </div>
       <div id="bulkPaymentError" class="form-error" role="alert" hidden></div>
       <div class="form-actions">
@@ -613,7 +621,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="logic.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="logic.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

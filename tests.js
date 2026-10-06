@@ -100,8 +100,8 @@ assert.deepEqual(summarizeOutstanding([
   { employeeId: "alice", status: "pending", finalValue: 978.25 },
   { employeeId: "joao", status: "paid", finalValue: 480 }
 ], [
-  { employeeId: "alice", value: 49.99 },
-  { employeeId: "joao", value: 609.58 }
+  { employeeId: "alice", status: "pending", value: 49.99 },
+  { employeeId: "joao", status: "paid", paidDate: "2026-09-21", value: 609.58 }
 ]), {
   pendingGross: 978.25,
   pendingAdvances: 49.99,
@@ -111,7 +111,7 @@ assert.deepEqual(summarizeOutstanding([
 assert.deepEqual(summarizeOutstanding([
   { employeeId: "alice", status: "paid", finalValue: 978.25 }
 ], [
-  { employeeId: "alice", value: 49.99 }
+  { employeeId: "alice", status: "paid", paidDate: "2026-09-21", value: 49.99 }
 ]), {
   pendingGross: 0,
   pendingAdvances: 0,
@@ -122,8 +122,8 @@ assert.deepEqual(summarizePaid([
   { employeeId: "alice", status: "pending", finalValue: 978.25 },
   { employeeId: "joao", status: "paid", paidDate: "2026-09-21", finalValue: 1000 }
 ], [
-  { employeeId: "alice", value: 49.99 },
-  { employeeId: "joao", value: 609.58 }
+  { employeeId: "alice", status: "pending", value: 49.99 },
+  { employeeId: "joao", status: "paid", paidDate: "2026-09-21", value: 609.58 }
 ]), {
   paidGross: 1000,
   paidAdvances: 609.58,
@@ -136,11 +136,29 @@ assert.deepEqual(summarizePaid([
   { employeeId: "alice", status: "paid", paidDate: "2026-09-21", finalValue: 500 },
   { employeeId: "alice", status: "pending", finalValue: 478.25 }
 ], [
-  { employeeId: "alice", value: 49.99 }
+  { employeeId: "alice", status: "pending", value: 49.99 }
 ]), {
   paidGross: 500,
   paidAdvances: 0,
   paidNet: 500,
+  paidEmployeeCount: 1,
+  latestPaidDate: "2026-09-21",
+  paymentDates: ["2026-09-21"]
+});
+assert.deepEqual(summarizeOutstanding([], [
+  { employeeId: "joao", status: "pending", value: 30 }
+]), {
+  pendingGross: 0,
+  pendingAdvances: 30,
+  pendingNet: -30,
+  pendingEmployeeCount: 1
+});
+assert.deepEqual(summarizePaid([], [
+  { employeeId: "joao", status: "paid", paidDate: "2026-09-21", value: 30 }
+]), {
+  paidGross: 0,
+  paidAdvances: 30,
+  paidNet: -30,
   paidEmployeeCount: 1,
   latestPaidDate: "2026-09-21",
   paymentDates: ["2026-09-21"]

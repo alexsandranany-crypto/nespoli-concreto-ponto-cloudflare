@@ -365,7 +365,7 @@ td.negative-text { color: var(--danger) !important; }
 .advance-history-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 13px; }
 .advance-history-heading h3 { margin: 0; font-size: .95rem; }
 .advance-history-heading p { margin: 4px 0 0; color: #667185; font-size: .78rem; }
-.advance-filters { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)) auto; align-items: end; gap: 12px; }
+.advance-filters { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) auto; align-items: end; gap: 12px; }
 .advance-employee-filter-field { grid-column: 1 / -1; min-width: 0; margin: 0; padding: 0; border: 0; }
 .advance-employee-filter-field legend { margin: 0 0 8px; padding: 0; color: #3e4960; font-size: .9rem; font-weight: 800; }
 .advance-selection-help { margin: -2px 0 10px; color: #667185; font-size: .84rem; }
@@ -390,6 +390,7 @@ td.negative-text { color: var(--danger) !important; }
 .advance-info { min-width: 0; }
 .advance-info strong { display: block; font-size: .85rem; overflow-wrap: anywhere; }
 .advance-info small { display: block; margin-top: 3px; color: #778195; font-size: .7rem; overflow-wrap: anywhere; }
+.advance-info .badge { margin-top: 7px; }
 .advance-amount { flex: 0 0 auto; color: var(--danger); font-weight: 900; }
 .advance-actions { display: flex; gap: 6px; }
 .advance-empty { padding: 28px; color: #7a8495; font-size: .82rem; text-align: center; }

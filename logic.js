@@ -154,11 +154,13 @@
   function summarizeOutstanding(items = [], advances = []) {
     const safeItems = Array.isArray(items) ? items : [];
     const pendingItems = safeItems.filter((item) => item?.status !== "paid");
-    const pendingEmployeeIds = new Set(pendingItems.map((item) => item?.employeeId).filter(Boolean));
+    const pendingAdvanceItems = (Array.isArray(advances) ? advances : []).filter((advance) => advance?.status !== "paid");
+    const pendingEmployeeIds = new Set([
+      ...pendingItems.map((item) => item?.employeeId).filter(Boolean),
+      ...pendingAdvanceItems.map((advance) => advance?.employeeId).filter(Boolean)
+    ]);
     const pendingGross = roundMoney(pendingItems.reduce((sum, item) => sum + Number(item?.finalValue || 0), 0));
-    const pendingAdvances = roundMoney((Array.isArray(advances) ? advances : [])
-      .filter((advance) => pendingEmployeeIds.has(advance?.employeeId))
-      .reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
+    const pendingAdvances = roundMoney(pendingAdvanceItems.reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
     return {
       pendingGross,
       pendingAdvances,
@@ -170,17 +172,17 @@
   function summarizePaid(items = [], advances = []) {
     const safeItems = Array.isArray(items) ? items : [];
     const paidItems = safeItems.filter((item) => item?.status === "paid");
-    const pendingEmployeeIds = new Set(safeItems
-      .filter((item) => item?.status !== "paid")
-      .map((item) => item?.employeeId)
-      .filter(Boolean));
-    const paidEmployeeIds = new Set(paidItems.map((item) => item?.employeeId).filter(Boolean));
-    const fullyPaidEmployeeIds = new Set([...paidEmployeeIds].filter((employeeId) => !pendingEmployeeIds.has(employeeId)));
+    const paidAdvanceItems = (Array.isArray(advances) ? advances : []).filter((advance) => advance?.status === "paid");
+    const paidEmployeeIds = new Set([
+      ...paidItems.map((item) => item?.employeeId).filter(Boolean),
+      ...paidAdvanceItems.map((advance) => advance?.employeeId).filter(Boolean)
+    ]);
     const paidGross = roundMoney(paidItems.reduce((sum, item) => sum + Number(item?.finalValue || 0), 0));
-    const paidAdvances = roundMoney((Array.isArray(advances) ? advances : [])
-      .filter((advance) => fullyPaidEmployeeIds.has(advance?.employeeId))
-      .reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
-    const paymentDates = [...new Set(paidItems.map((item) => String(item?.paidDate || "")).filter(Boolean))].sort();
+    const paidAdvances = roundMoney(paidAdvanceItems.reduce((sum, advance) => sum + Number(advance?.value || 0), 0));
+    const paymentDates = [...new Set([
+      ...paidItems.map((item) => String(item?.paidDate || "")),
+      ...paidAdvanceItems.map((advance) => String(advance?.paidDate || ""))
+    ].filter(Boolean))].sort();
     return {
       paidGross,
       paidAdvances,

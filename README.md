@@ -6,6 +6,8 @@ Os atalhos de fechamento separam os ciclos em 22–07 e 08–21, evitando repeti
 
 Quando a diária do dia 21 já tiver sido paga antes do fim da jornada, o modo “Diária já paga” calcula apenas o saldo acima ou abaixo de 8 horas e leva esse saldo para o ciclo 22–07.
 
+Vales têm situação “Não pago” ou “Pago/descontado”. Ao finalizar o pagamento de um colaborador, os vales não pagos daquele período recebem a mesma data do pagamento. Na migração, os vales de 04/09/2026 a 21/09/2026 são identificados como pagos/descontados em 21/09/2026.
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/alexsandranany-crypto/nespoli-concreto-ponto-cloudflare)
 
 ## Implantar

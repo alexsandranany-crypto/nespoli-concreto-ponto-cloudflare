@@ -16,12 +16,13 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 8, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 9, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
   let activeProfileEmployeeId = null;
   let activeBulkPaymentEntryIds = [];
+  let activeBulkPaymentAdvanceIds = [];
   let toastTimer;
   let cloudRevision = 0;
   let cloudInitialized = false;
@@ -67,8 +68,8 @@
     advanceForm: $("#advanceForm"), advanceId: $("#advanceId"), advanceEmployee: $("#advanceEmployee"), advanceDate: $("#advanceDate"),
     advanceValue: $("#advanceValue"), advanceNote: $("#advanceNote"), advanceError: $("#advanceError"), advancesList: $("#advancesList"),
     advanceFilterEmployee: $("#advanceFilterEmployee"), advanceFilterEmployees: $("#advanceFilterEmployees"),
-    advanceFilterStart: $("#advanceFilterStart"), advanceFilterEnd: $("#advanceFilterEnd"), advanceFilterPeriod: $("#advanceFilterPeriod"),
-    advanceFilterSelection: $("#advanceFilterSelection"), advanceFilterCount: $("#advanceFilterCount"), advanceFilterTotal: $("#advanceFilterTotal"),
+    advanceFilterStart: $("#advanceFilterStart"), advanceFilterEnd: $("#advanceFilterEnd"), advanceFilterStatus: $("#advanceFilterStatus"), advanceFilterPeriod: $("#advanceFilterPeriod"),
+    advanceFilterSelection: $("#advanceFilterSelection"), advanceFilterCount: $("#advanceFilterCount"), advanceFilterTotal: $("#advanceFilterTotal"), advanceTotalLabel: $("#advanceTotalLabel"),
     saveAdvanceBtn: $("#saveAdvanceBtn"), cancelAdvanceEditBtn: $("#cancelAdvanceEditBtn"),
     bulkPaymentDialog: $("#bulkPaymentDialog"), bulkPaymentForm: $("#bulkPaymentForm"), bulkPaymentEmployeeName: $("#bulkPaymentEmployeeName"),
     bulkPaymentSummary: $("#bulkPaymentSummary"), bulkPaymentDate: $("#bulkPaymentDate"), bulkPaymentError: $("#bulkPaymentError"), toast: $("#toast")
@@ -164,8 +165,17 @@
   }
 
   function normalizeState(data) {
-    data.version = 8;
-    data.advances = Array.isArray(data.advances) ? data.advances : [];
+    data.version = 9;
+    data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
+      const hadStatus = advance.status === "paid" || advance.status === "pending";
+      const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
+      const status = advance.status === "paid" || (!hadStatus && belongsToPaidSeptemberPeriod) ? "paid" : "pending";
+      return {
+        ...advance,
+        status,
+        paidDate: status === "paid" ? String(advance.paidDate || (belongsToPaidSeptemberPeriod ? "2026-09-21" : "")) : ""
+      };
+    });
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
       const paymentType = employee.paymentType === "monthly" ? "monthly" : "daily";
@@ -273,6 +283,7 @@
         const cloud = await fetchCloudState();
         cloudRevision = Number(cloud.revision) || 0;
         cloudInitialized = true;
+        const cloudSourceVersion = Number(cloud.state?.version) || 0;
         const cloudState = cloud.state && Array.isArray(cloud.state.employees) && Array.isArray(cloud.state.entries)
           ? normalizeState(cloud.state)
           : null;
@@ -286,6 +297,12 @@
           renderAll();
           updatePreview();
         } else if (hasBusinessData(state) && (!cloudState || localTime > cloudTime)) {
+          await pushCloudState();
+          return;
+        }
+        if (cloudSourceVersion < 9 && hasBusinessData(state)) {
+          state.updatedAt = new Date().toISOString();
+          persistLocalState();
           await pushCloudState();
           return;
         }
@@ -403,6 +420,7 @@
     dom.advanceEmployee.addEventListener("change", syncAdvanceEmployeeSelection);
     dom.advanceFilterStart.addEventListener("change", renderAdvances);
     dom.advanceFilterEnd.addEventListener("change", renderAdvances);
+    dom.advanceFilterStatus.addEventListener("change", renderAdvances);
     $("#clearAdvanceFiltersBtn").addEventListener("click", clearAdvanceFilters);
     [dom.filterStart, dom.filterEnd].forEach((input) => input.addEventListener("change", () => { activePeriod = "custom"; updateActiveChips(); renderDashboard(); }));
     [dom.filterEmployee, dom.filterStatus].forEach((input) => input.addEventListener("change", renderDashboard));
@@ -863,15 +881,17 @@
     if (!employee || !dom.advanceDate.value || !Number.isFinite(value) || value <= 0) {
       return showError(dom.advanceError, "Informe o colaborador, a data e um valor válido.");
     }
+    const existing = state.advances.find((advance) => advance.id === dom.advanceId.value);
     const payload = {
       employeeId: employee.id,
       employeeNameSnapshot: employee.name,
       date: dom.advanceDate.value,
       value: L.roundMoney(value),
       note: dom.advanceNote.value.trim(),
+      status: existing?.status === "paid" ? "paid" : "pending",
+      paidDate: existing?.status === "paid" ? String(existing.paidDate || "") : "",
       updatedAt: new Date().toISOString()
     };
-    const existing = state.advances.find((advance) => advance.id === dom.advanceId.value);
     if (existing) Object.assign(existing, payload);
     else state.advances.push({ id: uid(), ...payload, createdAt: new Date().toISOString() });
     saveState();
@@ -886,6 +906,17 @@
     if (!button) return;
     const advance = state.advances.find((item) => item.id === button.dataset.id);
     if (!advance) return;
+    if (button.dataset.advanceAction === "toggle") {
+      const wasPaid = advance.status === "paid";
+      advance.status = wasPaid ? "pending" : "paid";
+      advance.paidDate = wasPaid ? "" : todayISO();
+      advance.updatedAt = new Date().toISOString();
+      saveState();
+      renderAdvances();
+      renderDashboard();
+      toast(wasPaid ? "Vale marcado como não pago." : "Vale marcado como pago/descontado.");
+      return;
+    }
     if (button.dataset.advanceAction === "edit") {
       dom.advanceId.value = advance.id;
       dom.advanceEmployee.value = advance.employeeId;
@@ -922,6 +953,7 @@
     dom.advanceFilterEmployee.value = "all";
     dom.advanceFilterStart.value = "";
     dom.advanceFilterEnd.value = "";
+    dom.advanceFilterStatus.value = "pending";
     renderAdvances();
   }
 
@@ -955,11 +987,13 @@
     const selectedEmployee = dom.advanceFilterEmployee.value || "all";
     const startDate = dom.advanceFilterStart.value;
     const endDate = dom.advanceFilterEnd.value;
+    const statusFilter = dom.advanceFilterStatus.value || "pending";
     const invalidPeriod = Boolean(startDate && endDate && startDate > endDate);
     const advances = invalidPeriod ? [] : state.advances
       .filter((advance) => selectedEmployee === "all" || advance.employeeId === selectedEmployee)
       .filter((advance) => !startDate || advance.date >= startDate)
       .filter((advance) => !endDate || advance.date <= endDate)
+      .filter((advance) => statusFilter === "all" || advance.status === statusFilter)
       .sort((a, b) => b.date.localeCompare(a.date));
     const total = advances.reduce((sum, advance) => sum + Number(advance.value), 0);
     updateAdvanceEmployeeFilterButtons();
@@ -972,13 +1006,14 @@
     dom.advanceFilterCount.textContent = invalidPeriod
       ? "Revise as datas do período"
       : `${advances.length} ${advances.length === 1 ? "vale encontrado" : "vales encontrados"}`;
+    dom.advanceTotalLabel.textContent = statusFilter === "paid" ? "Total já pago/descontado" : statusFilter === "pending" ? "Total dos vales não pagos" : "Total de todos os vales";
     dom.advanceFilterTotal.textContent = currency.format(total);
     dom.advancesList.innerHTML = invalidPeriod
       ? '<div class="advance-empty">A data inicial precisa ser anterior à data final.</div>'
       : advances.length ? advances.map((advance) => `<div class="advance-item">
-      <div class="advance-info"><strong>${escapeHTML(displayEmployeeName(advance.employeeId, advance))} • ${dateBR(advance.date)}</strong><small>${escapeHTML(advance.note || "Vale/adiantamento")}</small></div>
+      <div class="advance-info"><strong>${escapeHTML(displayEmployeeName(advance.employeeId, advance))} • ${dateBR(advance.date)}</strong><small>${escapeHTML(advance.note || "Vale/adiantamento")}</small><span class="badge ${advance.status === "paid" ? "paid" : "pending"}">${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "Não pago"}</span></div>
       <div class="advance-amount">− ${currency.format(advance.value)}</div>
-      <div class="advance-actions"><button class="mini-btn" data-advance-action="edit" data-id="${advance.id}" type="button">Editar</button><button class="mini-btn delete" data-advance-action="delete" data-id="${advance.id}" type="button">Excluir</button></div>
+      <div class="advance-actions"><button class="mini-btn ${advance.status === "paid" ? "" : "payment-action"}" data-advance-action="toggle" data-id="${advance.id}" type="button">${advance.status === "paid" ? "Marcar não pago" : "Marcar pago"}</button><button class="mini-btn" data-advance-action="edit" data-id="${advance.id}" type="button">Editar</button><button class="mini-btn delete" data-advance-action="delete" data-id="${advance.id}" type="button">Excluir</button></div>
     </div>`).join("") : '<div class="advance-empty">Nenhum vale encontrado com estes filtros.</div>';
   }
 
@@ -1206,12 +1241,14 @@
     const selectedIds = new Set(entries.map((entry) => entry.id));
     const hasRemainingPending = visibleEmployeeEntries(employeeId)
       .some((entry) => entry.status !== "paid" && !selectedIds.has(entry.id));
-    const advancesToDiscount = hasRemainingPending ? 0 : getFilteredAdvances(employeeId)
-      .reduce((sum, advance) => sum + Number(advance.value || 0), 0);
+    const advancesToPay = hasRemainingPending ? [] : getAdvancesInCurrentPeriod(employeeId)
+      .filter((advance) => advance.status !== "paid");
+    const advancesToDiscount = advancesToPay.reduce((sum, advance) => sum + Number(advance.value || 0), 0);
     const netTotal = L.roundMoney(grossTotal - advancesToDiscount);
     activeBulkPaymentEntryIds = entries.map((entry) => entry.id);
+    activeBulkPaymentAdvanceIds = advancesToPay.map((advance) => advance.id);
     dom.bulkPaymentEmployeeName.textContent = employee?.name || entries[0]?.employeeNameSnapshot || "Colaborador";
-    dom.bulkPaymentSummary.textContent = `${entries.length} ${entries.length === 1 ? "jornada não paga" : "jornadas não pagas"} • bruto ${currency.format(grossTotal)} • vales ${currency.format(advancesToDiscount)} • total líquido a pagar ${currency.format(netTotal)}`;
+    dom.bulkPaymentSummary.textContent = `${entries.length} ${entries.length === 1 ? "jornada não paga" : "jornadas não pagas"} • bruto ${currency.format(grossTotal)} • ${advancesToPay.length} vale(s) não pago(s): ${currency.format(advancesToDiscount)} • total líquido a pagar ${currency.format(netTotal)}`;
     dom.bulkPaymentDate.value = todayISO();
     hideError(dom.bulkPaymentError);
     dom.bulkPaymentDialog.showModal();
@@ -1229,13 +1266,19 @@
     }
     if (button.dataset.groupAction === "unpay") {
       const paidEntries = entries.filter((entry) => entry.status === "paid");
-      if (!paidEntries.length) return toast("Não há jornadas pagas neste período.");
+      const paidAdvances = getAdvancesInCurrentPeriod(employeeId).filter((advance) => advance.status === "paid");
+      if (!paidEntries.length && !paidAdvances.length) return toast("Não há jornadas ou vales pagos neste período.");
       const name = getEmployee(employeeId)?.name || paidEntries[0]?.employeeNameSnapshot || "este colaborador";
-      if (!confirm(`Marcar ${paidEntries.length} jornada(s) de ${name} como não paga(s) neste período?`)) return;
+      if (!confirm(`Marcar ${paidEntries.length} jornada(s) e ${paidAdvances.length} vale(s) de ${name} como não pagos neste período?`)) return;
       paidEntries.forEach((entry) => {
         entry.status = "pending";
         entry.paidDate = "";
         entry.updatedAt = new Date().toISOString();
+      });
+      paidAdvances.forEach((advance) => {
+        advance.status = "pending";
+        advance.paidDate = "";
+        advance.updatedAt = new Date().toISOString();
       });
       saveState();
       renderDashboard();
@@ -1254,11 +1297,18 @@
       entry.paidDate = dom.bulkPaymentDate.value;
       entry.updatedAt = new Date().toISOString();
     });
+    const advances = state.advances.filter((advance) => activeBulkPaymentAdvanceIds.includes(advance.id));
+    advances.forEach((advance) => {
+      advance.status = "paid";
+      advance.paidDate = dom.bulkPaymentDate.value;
+      advance.updatedAt = new Date().toISOString();
+    });
     saveState();
     activeBulkPaymentEntryIds = [];
+    activeBulkPaymentAdvanceIds = [];
     dom.bulkPaymentDialog.close();
     renderDashboard();
-    toast(`${entries.length} jornada(s) paga(s) em ${dateBR(dom.bulkPaymentDate.value)}.`);
+    toast(`${entries.length} jornada(s) e ${advances.length} vale(s) finalizados em ${dateBR(dom.bulkPaymentDate.value)}.`);
   }
 
   function editEntry(entry) {
@@ -1352,14 +1402,19 @@
     }).sort((a, b) => b.date.localeCompare(a.date) || (a.employeeNameSnapshot || "").localeCompare(b.employeeNameSnapshot || "", "pt-BR"));
   }
 
-  function getFilteredAdvances(employeeFilter = dom.filterEmployee.value) {
-    if (dom.filterStatus.value === "absence") return [];
+  function getAdvancesInCurrentPeriod(employeeFilter = dom.filterEmployee.value) {
     return state.advances.filter((advance) => {
       if (employeeFilter !== "all" && advance.employeeId !== employeeFilter) return false;
       if (dom.filterStart.value && advance.date < dom.filterStart.value) return false;
       if (dom.filterEnd.value && advance.date > dom.filterEnd.value) return false;
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function getFilteredAdvances(employeeFilter = dom.filterEmployee.value) {
+    if (dom.filterStatus.value === "absence") return [];
+    return getAdvancesInCurrentPeriod(employeeFilter)
+      .filter((advance) => !["paid", "pending"].includes(dom.filterStatus.value) || advance.status === dom.filterStatus.value);
   }
 
   function renderDashboard() {
@@ -1452,7 +1507,7 @@
           <div class="group-totals"><div><span>Horas para pagamento</span><strong>${formatPaymentMinutes(minutes)}</strong></div><div><span>Bruto</span><strong>${currency.format(gross)}</strong></div><div><span>Vales</span><strong>− ${currency.format(advancesTotal)}</strong></div><div><span>Líquido</span><strong>${currency.format(net)}</strong></div></div>
         </header>
         ${displayRows.length ? `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Jornada</th><th>Intervalo</th><th>Horas</th><th>Base de cálculo</th><th>Valor</th><th>Status</th><th>Observação</th><th></th></tr></thead><tbody>${displayRows.map(({ entry, calc }) => renderEntryRow(entry, calc)).join("")}</tbody></table></div>` : ""}
-        ${groupAdvances.length ? `<div class="group-advances"><strong>Vales descontados</strong>${groupAdvances.map((advance) => `<span>${dateBR(advance.date)} • ${escapeHTML(advance.note || "Vale/adiantamento")} • <b>− ${currency.format(advance.value)}</b></span>`).join("")}</div>` : ""}
+        ${groupAdvances.length ? `<div class="group-advances"><strong>Vales do período</strong>${groupAdvances.map((advance) => `<span>${dateBR(advance.date)} • ${escapeHTML(advance.note || "Vale/adiantamento")} • <b>− ${currency.format(advance.value)}</b> • ${advance.status === "paid" ? `pago${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "não pago"}</span>`).join("")}</div>` : ""}
       </section>`;
     }).join("");
   }
@@ -1622,7 +1677,7 @@
       });
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       advancesTotal += employeeAdvancesTotal;
-      const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"}`);
+      const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"} | ${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "Não pago"}`);
       const employee = getEmployee(employeeId);
       const scheduleLine = employee?.paySchedule === "monthlyFifthWeekday" ? `\n${paymentScheduleLabel(employee, items)}` : "";
       const employeePaidSummary = L.summarizePaid(items.filter((entry) => !L.isAbsence(entry)).map((entry) => {
@@ -1670,15 +1725,16 @@
         return `<tr><td>${dateBR(entry.date)}</td><td>${entry.start}–${entry.end}</td><td>${interval}</td><td>${hoursText}</td><td>${escapeHTML(paymentBaseLabel(calc))}<div class="report-adjustment">${currency.format(calc.hourlyRate)}/h</div></td><td>${currency.format(calc.finalValue)}${balance}${adjustment}</td><td>${paymentLabel}</td></tr>`;
       }).join("");
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
-      const advanceRows = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `<tr><td>${dateBR(advance.date)}</td><td>${escapeHTML(advance.note || "Vale/adiantamento")}</td><td>− ${currency.format(advance.value)}</td></tr>`).join("");
+      const advanceRows = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `<tr><td>${dateBR(advance.date)}</td><td>${escapeHTML(advance.note || "Vale/adiantamento")}</td><td>− ${currency.format(advance.value)}</td><td>${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? `<div class="report-payment-date">em ${dateBR(advance.paidDate)}</div>` : ""}` : "Não pago"}</td></tr>`).join("");
       const netTotal = subtotal - employeeAdvancesTotal;
-      const pendingNetSubtotal = pendingSubtotal === 0 ? 0 : pendingSubtotal - employeeAdvancesTotal;
       const paymentSummary = L.summarizePayments(workItems);
-      const paidNetSummary = L.summarizePaid(workItems.map((entry) => {
+      const employeePaymentItems = workItems.map((entry) => {
         const calc = calculateEntry(entry);
         return { employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
-      }), employeeAdvances);
-      const paidStateLabel = paidNetSummary.paidGross === 0 ? "NÃO PAGO" : pendingSubtotal > 0 ? "PAGO PARCIAL" : "PAGO";
+      });
+      const paidNetSummary = L.summarizePaid(employeePaymentItems, employeeAdvances);
+      const pendingNetSummary = L.summarizeOutstanding(employeePaymentItems, employeeAdvances);
+      const paidStateLabel = paidNetSummary.paidGross === 0 && paidNetSummary.paidAdvances === 0 ? "NÃO PAGO" : pendingSubtotal > 0 || pendingNetSummary.pendingAdvances > 0 ? "PAGO PARCIAL" : "PAGO";
       const paidDateLabel = paidNetSummary.latestPaidDate
         ? `${paidNetSummary.paymentDates.length > 1 ? "Último pagamento" : "Pagamento"}: ${dateBR(paidNetSummary.latestPaidDate)}`
         : "Nenhum pagamento registrado";
@@ -1706,7 +1762,7 @@
           <h3>Jornadas e faltas do período</h3>
           <div class="table-wrap"><table><thead><tr><th>Data</th><th>Jornada</th><th>Intervalo</th><th>Horas</th><th>Base de cálculo</th><th>Valor</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="7">Sem jornadas no período.</td></tr>'}</tbody></table></div>
         </div>
-        ${advanceRows ? `<div class="payslip-block payslip-advances"><h3>Vales / adiantamentos</h3><div class="table-wrap"><table><thead><tr><th>Data do vale</th><th>Descrição</th><th>Desconto</th></tr></thead><tbody>${advanceRows}</tbody></table></div></div>` : ""}
+        ${advanceRows ? `<div class="payslip-block payslip-advances"><h3>Vales / adiantamentos</h3><div class="table-wrap"><table><thead><tr><th>Data do vale</th><th>Descrição</th><th>Desconto</th><th>Situação</th></tr></thead><tbody>${advanceRows}</tbody></table></div></div>` : ""}
         <div class="payslip-totals">
           <div><span>Horas para pagamento</span><strong>${formatPaymentMinutes(minutes)}</strong></div>
           <div><span>Valor bruto</span><strong>${currency.format(subtotal)}</strong></div>
@@ -1714,7 +1770,7 @@
           <div class="payslip-net"><span>Valor líquido</span><strong>${currency.format(netTotal)}</strong></div>
         </div>
         <div class="payslip-paid-box"><div><span>TOTAL PAGO LÍQUIDO</span><strong>${currency.format(paidNetSummary.paidNet)}</strong><small>Período: ${reportPeriodText()} • ${paidDateLabel} • vales descontados: ${currency.format(paidNetSummary.paidAdvances)}</small></div><b>${paidStateLabel}</b></div>
-        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSubtotal)}</strong></span>${employee?.paySchedule === "monthlyFifthWeekday" ? `<span>Programação: <strong>${escapeHTML(schedule)}</strong></span>` : ""}</div>
+        <div class="payslip-payment-details"><span>Faltas registradas: <strong>${absenceCount}</strong></span><span>Jornadas pagas: <strong>${currency.format(paidSubtotal)}</strong></span><span>Saldo não pago após vales: <strong>${currency.format(pendingNetSummary.pendingNet)}</strong></span>${employee?.paySchedule === "monthlyFifthWeekday" ? `<span>Programação: <strong>${escapeHTML(schedule)}</strong></span>` : ""}</div>
         <div class="payslip-receipt">
           <p>Declaro que conferi as jornadas, as faltas, os vales e os valores acima referentes ao período informado.</p>
           <p class="payslip-date-line">Tangará da Serra, ______ de ____________________ de __________.</p>
@@ -1746,14 +1802,14 @@
       const calc = calculateEntry(entry);
       lines.push([entry.valueMode === "balance8h" ? "SALDO DE HORAS" : "JORNADA", displayEmployeeName(entry.employeeId, entry), dateBR(entry.date), entry.start, entry.breakStart || "", entry.breakEnd || "", entry.end, L.formatDuration(calc.workedMinutes), entry.valueMode === "balance8h" ? L.formatSignedDuration(calc.balanceMinutes) : "", calc.paymentType === "monthly" ? "Mensalista" : "Diária", calc.paymentType === "monthly" ? calc.monthlySalary.toFixed(2) : calc.dailyRate.toFixed(2), calc.hourlyRate.toFixed(2), calc.calculatedValue.toFixed(2), calc.finalValue.toFixed(2), calc.adjustment.toFixed(2), entry.manualReason || "", entry.status === "paid" ? "Pago" : "Não pago", entry.paidDate ? dateBR(entry.paidDate) : "", entry.notes || ""]);
     });
-    advances.forEach((advance) => lines.push(["VALE", displayEmployeeName(advance.employeeId, advance), dateBR(advance.date), "", "", "", "", "", "", "", "", "", "", (-Number(advance.value)).toFixed(2), "", "", "Desconto", "", advance.note || "Vale/adiantamento"]));
+    advances.forEach((advance) => lines.push(["VALE", displayEmployeeName(advance.employeeId, advance), dateBR(advance.date), "", "", "", "", "", "", "", "", "", "", (-Number(advance.value)).toFixed(2), "", "", advance.status === "paid" ? "Pago/descontado" : "Não pago", advance.paidDate ? dateBR(advance.paidDate) : "", advance.note || "Vale/adiantamento"]));
     const csv = "\uFEFF" + lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n");
     downloadBlob(csv, `relatorio-nespoli-concreto-${todayISO()}.csv`, "text/csv;charset=utf-8");
     toast("Planilha CSV baixada.");
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 8, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 9, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
@@ -1785,7 +1841,7 @@
     const data = parsed?.data || parsed;
     if (!Array.isArray(data?.employees) || !Array.isArray(data?.entries)) throw new Error("Formato inválido");
     if (!confirm(`Restaurar este backup com ${data.employees.length} colaborador(es), ${data.entries.length} registro(s) de jornada/falta e ${(data.advances || []).length} vale(s)? Os dados atuais serão substituídos.`)) return false;
-    state = normalizeState({ version: 8, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
+    state = normalizeState({ version: 9, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
     saveState();
     resetEntryForm();
     renderAll();
