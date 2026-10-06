@@ -34,10 +34,17 @@
             <p class="eyebrow accent">VISÃO DO PERÍODO</p>
           <h2 id="overviewTitle">Resumo de pagamentos</h2>
           <p id="periodLabel" class="muted">Todos os lançamentos</p>
+          <p id="periodHelp" class="period-help" hidden></p>
         </div>
         <div class="quick-periods" aria-label="Atalhos de período">
-          <button class="chip" data-period="close7" type="button">Fechamento 07</button>
-          <button class="chip active" data-period="close20" type="button">Fechamento 20</button>
+          <button class="chip period-chip" data-period="close7" type="button">
+            <span>Após pagamento do dia 21</span>
+            <strong id="close7Range">22 a 07</strong>
+          </button>
+          <button class="chip period-chip" data-period="close20" type="button">
+            <span>Ciclo do dia 08 ao 21</span>
+            <strong id="close20Range">08 a 21</strong>
+          </button>
           <button class="chip" data-period="month" type="button">Este mês</button>
           <button class="chip" data-period="all" type="button">Todos</button>
         </div>
@@ -601,7 +608,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="logic.js?v=18"></script>
-  <script src="app.js?v=18"></script>
+  <script src="logic.js?v=19"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

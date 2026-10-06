@@ -206,18 +206,23 @@
       return `${y}-${m}-${d}`;
     };
     if (type === "close7") {
-      const start = day >= 21 ? new Date(year, month, 21) : new Date(year, month - 1, 21);
-      const end = day >= 21 ? new Date(year, month + 1, 7) : new Date(year, month, 7);
+      const start = day >= 22 ? new Date(year, month, 22) : new Date(year, month - 1, 22);
+      const end = day >= 22 ? new Date(year, month + 1, 7) : new Date(year, month, 7);
       return { start: toISO(start), end: toISO(end) };
     }
     if (type === "close20") {
       const targetMonth = day < 8 ? month - 1 : month;
-      return { start: toISO(new Date(year, targetMonth, 8)), end: toISO(new Date(year, targetMonth, 20)) };
+      return { start: toISO(new Date(year, targetMonth, 8)), end: toISO(new Date(year, targetMonth, 21)) };
     }
     if (type === "month") {
       return { start: toISO(new Date(year, month, 1)), end: toISO(new Date(year, month + 1, 0)) };
     }
     return { start: "", end: "" };
+  }
+
+  function getCurrentCloseType(baseDate = new Date()) {
+    const day = baseDate.getDate();
+    return day <= 7 || day >= 22 ? "close7" : "close20";
   }
 
   function getFifthWeekdayPaymentDate(referenceDate) {
@@ -237,5 +242,5 @@
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
 });

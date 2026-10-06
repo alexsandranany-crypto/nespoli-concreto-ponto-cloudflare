@@ -83,6 +83,8 @@ button { cursor: pointer; }
 .section-heading.compact { align-items: center; margin-bottom: 22px; }
 .overview-heading { align-items: flex-end; margin-bottom: 18px; }
 .muted { margin: 4px 0 0; color: var(--ink-soft); font-size: .88rem; }
+.period-help { max-width: 650px; margin: 7px 0 0; color: #6d5720; font-size: .76rem; font-weight: 700; line-height: 1.4; }
+.period-help[hidden] { display: none; }
 .quick-periods { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .chip {
   padding: 8px 12px;
@@ -94,6 +96,9 @@ button { cursor: pointer; }
   font-weight: 700;
 }
 .chip:hover, .chip.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.period-chip { display: grid; min-width: 164px; gap: 1px; border-radius: 14px; text-align: left; }
+.period-chip span { font-size: .7rem; font-weight: 700; opacity: .78; }
+.period-chip strong { font-size: .9rem; line-height: 1.2; }
 
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 .stat-card {
@@ -455,6 +460,7 @@ body { font-size: 1rem; line-height: 1.45; }
 .save-status { font-size: .9rem; }
 .section-heading h2 { font-size: clamp(1.45rem, 2vw, 1.8rem); }
 .muted { font-size: .95rem; }
+.period-help { font-size: .86rem; }
 .chip { min-height: 44px; padding: 10px 15px; font-size: .9rem; }
 .stat-card { min-height: 132px; padding: 22px 24px; }
 .stat-card span { font-size: .9rem; }
@@ -539,6 +545,7 @@ td { padding: 13px; font-size: .9rem; }
   .page-shell { padding-top: 20px; }
   .overview-heading { display: block; }
   .quick-periods { justify-content: flex-start; margin-top: 15px; }
+  .period-chip { flex: 1 1 210px; min-width: 0; }
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat-card { min-height: 105px; padding: 15px; }
   .panel { border-radius: 15px; }

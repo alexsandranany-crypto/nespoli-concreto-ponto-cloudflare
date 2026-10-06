@@ -18,7 +18,7 @@
 
   const defaultState = () => ({ version: 7, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
-  let activePeriod = "close20";
+  let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
   let activeProfileEmployeeId = null;
   let activeBulkPaymentEntryIds = [];
@@ -31,7 +31,8 @@
   let cloudRefreshPromise = null;
 
   const dom = {
-    saveStatus: $("#saveStatus"), periodLabel: $("#periodLabel"), statEmployees: $("#statEmployees"), statEntries: $("#statEntries"),
+    saveStatus: $("#saveStatus"), periodLabel: $("#periodLabel"), periodHelp: $("#periodHelp"),
+    close7Range: $("#close7Range"), close20Range: $("#close20Range"), statEmployees: $("#statEmployees"), statEntries: $("#statEntries"),
     statHours: $("#statHours"), statTotal: $("#statTotal"), statAdvances: $("#statAdvances"), statPending: $("#statPending"),
     statPaidNet: $("#statPaidNet"), statPaidDetails: $("#statPaidDetails"), statPendingDetails: $("#statPendingDetails"),
     entryForm: $("#entryForm"), entryId: $("#entryId"), employeeSelect: $("#employeeSelect"), workDate: $("#workDate"), recordType: $("#recordType"),
@@ -80,7 +81,8 @@
     dom.paymentDate.value = todayISO();
     bindEvents();
     updateRecordTypeFields();
-    applyQuickPeriod("close20");
+    updateQuickPeriodLabels();
+    applyQuickPeriod(activePeriod);
     renderAll();
     updatePreview();
     setSaveStatus("syncing", "Conectando à nuvem…");
@@ -1466,6 +1468,16 @@
     renderDashboard();
   }
 
+  function compactPeriodRange(period) {
+    return `${dateBR(period.start).slice(0, 5)} a ${dateBR(period.end).slice(0, 5)}`;
+  }
+
+  function updateQuickPeriodLabels() {
+    const now = new Date();
+    dom.close7Range.textContent = compactPeriodRange(L.getClosePeriod("close7", now));
+    dom.close20Range.textContent = compactPeriodRange(L.getClosePeriod("close20", now));
+  }
+
   function updateActiveChips() { $$("[data-period]").forEach((button) => button.classList.toggle("active", button.dataset.period === activePeriod)); }
   function updatePeriodLabel() {
     const start = dom.filterStart.value;
@@ -1474,6 +1486,15 @@
     if (dom.filterEmployee.value !== "all") label += ` • ${getEmployee(dom.filterEmployee.value)?.name || "Colaborador"}`;
     if (dom.filterStatus.value !== "all") label += ` • ${dom.filterStatus.value === "paid" ? "Pagos" : dom.filterStatus.value === "absence" ? "Faltas" : "Não pagos"}`;
     dom.periodLabel.textContent = label;
+    const helpText = activePeriod === "close7"
+      ? "Novo ciclo: começa no dia 22 para não repetir a diária do dia 21, que já ficou no pagamento anterior."
+      : activePeriod === "close20"
+        ? "Ciclo de trabalho do dia 08 ao dia 21."
+        : activePeriod === "custom"
+          ? "Período escolhido manualmente nos filtros abaixo."
+          : "";
+    dom.periodHelp.textContent = helpText;
+    dom.periodHelp.hidden = !helpText;
   }
 
   function openReport() {

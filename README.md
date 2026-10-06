@@ -2,6 +2,8 @@
 
 Aplicativo privado de jornada, pagamentos, vales e fichas cadastrais de colaboradores, preparado para Cloudflare Workers + D1.
 
+Os atalhos de fechamento separam os ciclos em 22–07 e 08–21, evitando repetir no novo período a diária já encerrada no dia 21.
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/alexsandranany-crypto/nespoli-concreto-ponto-cloudflare)
 
 ## Implantar
