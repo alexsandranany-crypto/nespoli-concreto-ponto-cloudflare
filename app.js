@@ -23,6 +23,7 @@
   let activeProfileEmployeeId = null;
   let activeBulkPaymentEntryIds = [];
   let activeBulkPaymentAdvanceIds = [];
+  let lastSavedAdvanceId = "";
   let toastTimer;
   let cloudRevision = 0;
   let cloudInitialized = false;
@@ -438,6 +439,7 @@
     dom.advanceFilterStart.addEventListener("change", renderAdvances);
     dom.advanceFilterEnd.addEventListener("change", renderAdvances);
     dom.advanceFilterStatus.addEventListener("change", renderAdvances);
+    $("#refreshAdvancesBtn").addEventListener("click", refreshAdvancesFromCloud);
     $("#clearAdvanceFiltersBtn").addEventListener("click", clearAdvanceFilters);
     [dom.filterStart, dom.filterEnd].forEach((input) => input.addEventListener("change", () => { activePeriod = "custom"; updateActiveChips(); renderDashboard(); }));
     dom.filterPaySchedule.addEventListener("change", () => {
@@ -892,6 +894,19 @@
     resetAdvanceForm();
     renderAdvances();
     dom.advancesDialog.showModal();
+    refreshAdvancesFromCloud(false);
+  }
+
+  async function refreshAdvancesFromCloud(showConfirmation = true) {
+    const button = $("#refreshAdvancesBtn");
+    button.disabled = true;
+    button.textContent = "Atualizando…";
+    await initializeCloudSync();
+    renderEmployeeSelects();
+    renderAdvances();
+    button.disabled = false;
+    button.textContent = "Atualizar da nuvem";
+    if (showConfirmation) toast("Lista de vales atualizada.");
   }
 
   function saveAdvance(event) {
@@ -913,13 +928,28 @@
       paidDate: existing?.status === "paid" ? String(existing.paidDate || "") : "",
       updatedAt: new Date().toISOString()
     };
-    if (existing) Object.assign(existing, payload);
-    else state.advances.push({ id: uid(), ...payload, createdAt: new Date().toISOString() });
+    let savedAdvance;
+    if (existing) {
+      Object.assign(existing, payload);
+      savedAdvance = existing;
+    } else {
+      savedAdvance = { id: uid(), ...payload, createdAt: new Date().toISOString() };
+      state.advances.push(savedAdvance);
+    }
+    lastSavedAdvanceId = savedAdvance.id;
     saveState();
+    dom.advanceFilterEmployee.value = employee.id;
+    dom.advanceFilterStart.value = "";
+    dom.advanceFilterEnd.value = "";
+    dom.advanceFilterStatus.value = savedAdvance.status;
+    dom.filterPaySchedule.value = employee.paySchedule === "monthlyFifthWeekday" ? "fifthWeekday" : "hours";
+    dom.filterStatus.value = "all";
+    renderMainEmployeeFilter(employee.id);
     resetAdvanceForm();
     renderAdvances();
     renderDashboard();
-    toast(existing ? "Vale atualizado." : "Vale adicionado e descontado do período.");
+    setTimeout(() => document.querySelector(`[data-advance-id="${savedAdvance.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
+    toast(existing ? `Vale de ${employee.name} atualizado e exibido abaixo.` : `Vale de ${employee.name} salvo e exibido abaixo.`);
   }
 
   function handleAdvanceAction(event) {
@@ -1031,7 +1061,7 @@
     dom.advanceFilterTotal.textContent = currency.format(total);
     dom.advancesList.innerHTML = invalidPeriod
       ? '<div class="advance-empty">A data inicial precisa ser anterior à data final.</div>'
-      : advances.length ? advances.map((advance) => `<div class="advance-item">
+      : advances.length ? advances.map((advance) => `<div class="advance-item${advance.id === lastSavedAdvanceId ? " newly-saved" : ""}" data-advance-id="${advance.id}">
       <div class="advance-info"><strong>${escapeHTML(displayEmployeeName(advance.employeeId, advance))} • ${dateBR(advance.date)}</strong><small>${escapeHTML(advance.note || "Vale/adiantamento")}</small><span class="badge ${advance.status === "paid" ? "paid" : "pending"}">${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "Não pago"}</span></div>
       <div class="advance-amount">− ${currency.format(advance.value)}</div>
       <div class="advance-actions"><button class="mini-btn ${advance.status === "paid" ? "" : "payment-action"}" data-advance-action="toggle" data-id="${advance.id}" type="button">${advance.status === "paid" ? "Marcar não pago" : "Marcar pago"}</button><button class="mini-btn" data-advance-action="edit" data-id="${advance.id}" type="button">Editar</button><button class="mini-btn delete" data-advance-action="delete" data-id="${advance.id}" type="button">Excluir</button></div>
