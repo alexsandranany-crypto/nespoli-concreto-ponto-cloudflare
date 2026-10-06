@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 10, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 11, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -166,11 +166,17 @@
 
   function normalizeState(data) {
     const sourceVersion = Number(data.version) || 0;
-    data.version = 10;
+    const aliceEmployeeIds = new Set((Array.isArray(data.employees) ? data.employees : [])
+      .filter((employee) => employee.paySchedule === "monthlyFifthWeekday" || textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice"))
+      .map((employee) => employee.id));
+    data.version = 11;
     data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
       const hadStatus = advance.status === "paid" || advance.status === "pending";
       const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
-      const status = advance.status === "paid" || (!hadStatus && belongsToPaidSeptemberPeriod) ? "paid" : "pending";
+      const correctUnpaidAliceAdvance = sourceVersion < 11 && aliceEmployeeIds.has(advance.employeeId);
+      const status = correctUnpaidAliceAdvance
+        ? "pending"
+        : advance.status === "paid" || (!hadStatus && belongsToPaidSeptemberPeriod) ? "paid" : "pending";
       return {
         ...advance,
         status,
@@ -302,7 +308,7 @@
           await pushCloudState();
           return;
         }
-        if (cloudSourceVersion < 10 && hasBusinessData(state)) {
+        if (cloudSourceVersion < 11 && hasBusinessData(state)) {
           state.updatedAt = new Date().toISOString();
           persistLocalState();
           await pushCloudState();
@@ -1845,7 +1851,7 @@
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 10, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 11, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
