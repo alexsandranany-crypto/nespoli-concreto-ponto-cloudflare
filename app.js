@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 9, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 10, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -43,7 +43,7 @@
     timeGrid: $("#timeGrid"), calculationMode: $("#calculationMode"), calcPreview: $("#calcPreview"), absenceFormNotice: $("#absenceFormNotice"), balanceCarryNotice: $("#balanceCarryNotice"),
     previewHours: $("#previewHours"), previewCalculated: $("#previewCalculated"), previewFinal: $("#previewFinal"), formulaNote: $("#formulaNote"), notesLabel: $("#notesLabel"), entryFormTitle: $("#entryFormTitle"),
     rateHint: $("#rateHint"), adjustmentBox: $("#adjustmentBox"), formError: $("#formError"), formMode: $("#formMode"),
-    saveEntryBtn: $("#saveEntryBtn"), cancelEditBtn: $("#cancelEditBtn"), filterEmployee: $("#filterEmployee"), filterStart: $("#filterStart"),
+    saveEntryBtn: $("#saveEntryBtn"), cancelEditBtn: $("#cancelEditBtn"), filterPaySchedule: $("#filterPaySchedule"), filterEmployee: $("#filterEmployee"), filterStart: $("#filterStart"),
     filterEnd: $("#filterEnd"), filterStatus: $("#filterStatus"), recordsList: $("#recordsList"), emptyState: $("#emptyState"),
     absenceAlert: $("#absenceAlert"), absenceAlertText: $("#absenceAlertText"),
     employeesDialog: $("#employeesDialog"), employeeForm: $("#employeeForm"), employeeId: $("#employeeId"), employeeName: $("#employeeName"),
@@ -165,7 +165,8 @@
   }
 
   function normalizeState(data) {
-    data.version = 9;
+    const sourceVersion = Number(data.version) || 0;
+    data.version = 10;
     data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
       const hadStatus = advance.status === "paid" || advance.status === "pending";
       const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
@@ -179,6 +180,7 @@
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
       const paymentType = employee.paymentType === "monthly" ? "monthly" : "daily";
+      const migrateAliceToFifthWeekday = sourceVersion < 10 && textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice");
       const history = Array.isArray(employee.rateHistory) && employee.rateHistory.length
         ? employee.rateHistory
         : paymentType === "daily" ? [{ id: uid(), startDate: "0000-01-01", dailyRate: Number(employee.dailyRate) || 0 }] : [];
@@ -189,7 +191,7 @@
       return {
         ...employee,
         paymentType,
-        paySchedule: employee.paySchedule === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period",
+        paySchedule: employee.paySchedule === "monthlyFifthWeekday" || migrateAliceToFifthWeekday ? "monthlyFifthWeekday" : "period",
         profile: normalizeEmployeeProfile(employee),
         dailyRate: normalizedHistory.at(-1)?.dailyRate || Number(employee.dailyRate) || 0,
         rateHistory: normalizedHistory,
@@ -300,7 +302,7 @@
           await pushCloudState();
           return;
         }
-        if (cloudSourceVersion < 9 && hasBusinessData(state)) {
+        if (cloudSourceVersion < 10 && hasBusinessData(state)) {
           state.updatedAt = new Date().toISOString();
           persistLocalState();
           await pushCloudState();
@@ -387,10 +389,19 @@
     $("#printReportBtn").addEventListener("click", () => { if (!$("#printReportBtn").disabled) window.print(); });
     dom.reportEmployeeSelect.addEventListener("change", refreshReportPreview);
     $("#toggleFiltersBtn").addEventListener("click", () => dom.filtersPanel.classList.toggle("open"));
-    $("#clearFiltersBtn").addEventListener("click", () => applyQuickPeriod("all"));
+    $("#clearFiltersBtn").addEventListener("click", () => {
+      dom.filterPaySchedule.value = "hours";
+      renderMainEmployeeFilter();
+      applyQuickPeriod("all");
+    });
     $$("[data-close]").forEach((button) => button.addEventListener("click", () => document.getElementById(button.dataset.close).close()));
     $$(".dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
     $$("[data-period]").forEach((button) => button.addEventListener("click", () => applyQuickPeriod(button.dataset.period)));
+    $$("[data-pay-group]").forEach((button) => button.addEventListener("click", () => {
+      dom.filterPaySchedule.value = button.dataset.payGroup;
+      renderMainEmployeeFilter();
+      renderDashboard();
+    }));
 
     dom.employeeSelect.addEventListener("change", updatePreview);
     dom.workDate.addEventListener("change", updatePreview);
@@ -423,6 +434,10 @@
     dom.advanceFilterStatus.addEventListener("change", renderAdvances);
     $("#clearAdvanceFiltersBtn").addEventListener("click", clearAdvanceFilters);
     [dom.filterStart, dom.filterEnd].forEach((input) => input.addEventListener("change", () => { activePeriod = "custom"; updateActiveChips(); renderDashboard(); }));
+    dom.filterPaySchedule.addEventListener("change", () => {
+      renderMainEmployeeFilter();
+      renderDashboard();
+    });
     [dom.filterEmployee, dom.filterStatus].forEach((input) => input.addEventListener("change", renderDashboard));
     dom.recordsList.addEventListener("click", handleRecordAction);
     dom.employeesList.addEventListener("click", handleEmployeeAction);
@@ -658,7 +673,7 @@
       </div></section>
       <section class="profile-card"><h3>Pagamento</h3><div class="profile-data-grid">
         ${profileDataItem("Forma de cálculo", paymentLabel, true)}
-        ${profileDataItem("Quando pagar", paymentScheduleLabel(employee, state.entries.filter((entry) => entry.employeeId === employee.id)), true)}
+        ${profileDataItem("Grupo de pagamento", paymentScheduleLabel(employee, state.entries.filter((entry) => entry.employeeId === employee.id)), true)}
       </div></section>`;
     if (dom.employeesDialog.open) dom.employeesDialog.close();
     dom.employeeProfileDialog.showModal();
@@ -749,7 +764,7 @@
   }
 
   function paymentScheduleLabel(employee, workEntries = []) {
-    if (employee?.paySchedule !== "monthlyFifthWeekday") return "Pagamento conforme o fechamento";
+    if (employee?.paySchedule !== "monthlyFifthWeekday") return "Recebe pelas horas trabalhadas • pagamento no fechamento";
     const pendingDates = workEntries
       .filter((entry) => !L.isAbsence(entry) && entry.status !== "paid" && entry.date)
       .map((entry) => entry.date)
@@ -1351,14 +1366,27 @@
     dom.employeeSelect.innerHTML = options.length
       ? '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)} — ${escapeHTML(paymentBaseLabel(currentPaymentConfig(employee, dom.workDate.value || todayISO())))}</option>`).join("")
       : '<option value="">Cadastre um colaborador</option>';
-    dom.filterEmployee.innerHTML = '<option value="all">Todos</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)}</option>`).join("");
+    renderMainEmployeeFilter(currentFilter);
     dom.advanceEmployee.innerHTML = '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)}</option>`).join("");
     if (options.some((employee) => employee.id === currentEntry)) dom.employeeSelect.value = currentEntry;
-    if (options.some((employee) => employee.id === currentFilter)) dom.filterEmployee.value = currentFilter;
     if (options.some((employee) => employee.id === currentAdvance)) dom.advanceEmployee.value = currentAdvance;
     dom.advanceFilterEmployee.value = options.some((employee) => employee.id === currentAdvanceFilter) ? currentAdvanceFilter : "all";
     dom.advanceFilterEmployees.innerHTML = `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="all"><span class="advance-radio-mark" aria-hidden="true"></span><span>Todos os colaboradores</span></label>${options.map((employee) => `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="${escapeHTML(employee.id)}"><span class="advance-radio-mark" aria-hidden="true"></span><span>${escapeHTML(employee.name)}</span></label>`).join("")}`;
     updateAdvanceEmployeeFilterButtons();
+  }
+
+  function employeeMatchesPayGroup(employeeId) {
+    const employee = getEmployee(employeeId);
+    return L.matchesPaymentSchedule(employee?.paySchedule || "period", dom.filterPaySchedule.value || "hours");
+  }
+
+  function renderMainEmployeeFilter(preferredEmployeeId = dom.filterEmployee.value) {
+    const options = [...state.employees]
+      .filter((employee) => employeeMatchesPayGroup(employee.id))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    dom.filterEmployee.innerHTML = '<option value="all">Todos deste grupo</option>'
+      + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)}</option>`).join("");
+    dom.filterEmployee.value = options.some((employee) => employee.id === preferredEmployeeId) ? preferredEmployeeId : "all";
   }
 
   function renderEmployees() {
@@ -1390,6 +1418,7 @@
 
   function getFilteredEntries(employeeFilter = dom.filterEmployee.value) {
     return state.entries.filter((entry) => {
+      if (!employeeMatchesPayGroup(entry.employeeId)) return false;
       if (employeeFilter !== "all" && entry.employeeId !== employeeFilter) return false;
       if (dom.filterStatus.value === "absence" && !L.isAbsence(entry)) return false;
       if (["paid", "pending"].includes(dom.filterStatus.value) && (L.isAbsence(entry) || entry.status !== dom.filterStatus.value)) return false;
@@ -1404,6 +1433,7 @@
 
   function getAdvancesInCurrentPeriod(employeeFilter = dom.filterEmployee.value) {
     return state.advances.filter((advance) => {
+      if (!employeeMatchesPayGroup(advance.employeeId)) return false;
       if (employeeFilter !== "all" && advance.employeeId !== employeeFilter) return false;
       if (dom.filterStart.value && advance.date < dom.filterStart.value) return false;
       if (dom.filterEnd.value && advance.date > dom.filterEnd.value) return false;
@@ -1557,13 +1587,19 @@
   }
 
   function updateActiveChips() { $$("[data-period]").forEach((button) => button.classList.toggle("active", button.dataset.period === activePeriod)); }
+  function updateActivePaymentGroupButtons() { $$("[data-pay-group]").forEach((button) => button.classList.toggle("active", button.dataset.payGroup === dom.filterPaySchedule.value)); }
   function updatePeriodLabel() {
     const start = dom.filterStart.value;
     const end = dom.filterEnd.value;
     let label = start || end ? `${start ? dateBR(start) : "início"} a ${end ? dateBR(end) : "hoje"}` : "Todos os lançamentos";
+    const payGroupLabel = dom.filterPaySchedule.value === "fifthWeekday"
+      ? "Alice • 5º dia útil"
+      : dom.filterPaySchedule.value === "all" ? "Todos os grupos" : "Recebem por horas trabalhadas";
+    label += ` • ${payGroupLabel}`;
     if (dom.filterEmployee.value !== "all") label += ` • ${getEmployee(dom.filterEmployee.value)?.name || "Colaborador"}`;
     if (dom.filterStatus.value !== "all") label += ` • ${dom.filterStatus.value === "paid" ? "Pagos" : dom.filterStatus.value === "absence" ? "Faltas" : "Não pagos"}`;
     dom.periodLabel.textContent = label;
+    updateActivePaymentGroupButtons();
     const helpText = activePeriod === "close7"
       ? "Novo ciclo: começa no dia 22 para não repetir a diária do dia 21, que já ficou no pagamento anterior."
       : activePeriod === "close20"
@@ -1579,7 +1615,7 @@
     const entries = getFilteredEntries("all");
     const advances = getFilteredAdvances("all");
     const groups = groupForReport(entries, advances);
-    const reportEmployees = new Map(state.employees.map((employee) => [employee.id, employee.name]));
+    const reportEmployees = new Map(state.employees.filter((employee) => employeeMatchesPayGroup(employee.id)).map((employee) => [employee.id, employee.name]));
     groups.forEach((group) => { if (!reportEmployees.has(group.employeeId)) reportEmployees.set(group.employeeId, group.name); });
     const employeeOptions = [...reportEmployees.entries()]
       .map(([employeeId, name]) => ({ employeeId, name }))
@@ -1809,7 +1845,7 @@
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 9, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 10, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
@@ -1841,7 +1877,7 @@
     const data = parsed?.data || parsed;
     if (!Array.isArray(data?.employees) || !Array.isArray(data?.entries)) throw new Error("Formato inválido");
     if (!confirm(`Restaurar este backup com ${data.employees.length} colaborador(es), ${data.entries.length} registro(s) de jornada/falta e ${(data.advances || []).length} vale(s)? Os dados atuais serão substituídos.`)) return false;
-    state = normalizeState({ version: 9, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
+    state = normalizeState({ version: Number(data.version) || 0, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
     saveState();
     resetEntryForm();
     renderAll();

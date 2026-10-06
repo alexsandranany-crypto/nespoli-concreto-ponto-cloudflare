@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
+const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, matchesPaymentSchedule, parseMoneyInput } = require("./logic.js");
 
 assert.equal(parseMoneyInput("18,00"), 18);
 assert.equal(parseMoneyInput("49.99"), 49.99);
@@ -83,6 +83,11 @@ assert.equal(isBalanceCarryover({ date: "2026-09-21", valueMode: "balance8h" }, 
 assert.equal(getFifthWeekdayPaymentDate("2026-09-21"), "2026-10-07");
 assert.equal(getFifthWeekdayPaymentDate("2026-12-31"), "2027-01-07");
 assert.equal(getFifthWeekdayPaymentDate("data-invalida"), "");
+assert.equal(matchesPaymentSchedule("period", "hours"), true);
+assert.equal(matchesPaymentSchedule("monthlyFifthWeekday", "hours"), false);
+assert.equal(matchesPaymentSchedule("monthlyFifthWeekday", "fifthWeekday"), true);
+assert.equal(matchesPaymentSchedule("period", "fifthWeekday"), false);
+assert.equal(matchesPaymentSchedule("monthlyFifthWeekday", "all"), true);
 
 assert.deepEqual(summarizePayments([
   { status: "pending" },

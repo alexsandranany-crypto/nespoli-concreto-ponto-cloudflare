@@ -254,5 +254,11 @@
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
+  function matchesPaymentSchedule(paySchedule, group = "hours") {
+    if (group === "all") return true;
+    const isFifthWeekday = paySchedule === "monthlyFifthWeekday";
+    return group === "fifthWeekday" ? isFifthWeekday : !isFifthWeekday;
+  }
+
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, matchesPaymentSchedule, parseMoneyInput, roundMoney, timeToMinutes };
 });

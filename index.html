@@ -50,6 +50,13 @@
         </div>
       </div>
 
+      <div class="payment-group-bar" aria-label="Separar grupos de pagamento">
+        <strong>Mostrar:</strong>
+        <button class="payment-group-chip active" data-pay-group="hours" type="button">Quem recebe por horas trabalhadas</button>
+        <button class="payment-group-chip" data-pay-group="fifthWeekday" type="button">Alice — 5º dia útil</button>
+        <button class="payment-group-chip" data-pay-group="all" type="button">Todos</button>
+      </div>
+
       <div class="stats-grid">
         <article class="stat-card">
           <span>Colaboradores</span>
@@ -220,6 +227,14 @@
         </div>
 
         <div class="filters" id="filtersPanel">
+          <div class="field">
+            <label for="filterPaySchedule">Grupo de pagamento</label>
+            <select id="filterPaySchedule">
+              <option value="hours">Recebem por horas trabalhadas</option>
+              <option value="fifthWeekday">Alice — recebe no 5º dia útil</option>
+              <option value="all">Todos os grupos</option>
+            </select>
+          </div>
           <div class="field">
             <label for="filterEmployee">Colaborador</label>
             <select id="filterEmployee"><option value="all">Todos</option></select>
@@ -418,11 +433,12 @@
             </div>
           </div>
           <div class="field pay-schedule-field">
-            <label for="employeePaySchedule">Quando pagar</label>
+            <label for="employeePaySchedule">Grupo de pagamento</label>
             <select id="employeePaySchedule">
-              <option value="period">Conforme o fechamento</option>
-              <option value="monthlyFifthWeekday">Mensal — 5º dia útil</option>
+              <option value="period">Recebe pelas horas trabalhadas — no fechamento</option>
+              <option value="monthlyFifthWeekday">Recebe no 5º dia útil — segunda a sexta</option>
             </select>
+            <small>Para a Alice, escolha a opção do 5º dia útil.</small>
           </div>
         </div>
       </section>
@@ -621,7 +637,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="logic.js?v=21"></script>
-  <script src="app.js?v=21"></script>
+  <script src="logic.js?v=22"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>
