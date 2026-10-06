@@ -225,6 +225,16 @@
     return day <= 7 || day >= 22 ? "close7" : "close20";
   }
 
+  function isBalanceCarryover(entry, periodStart, periodType) {
+    if (periodType !== "close7" || entry?.valueMode !== "balance8h") return false;
+    const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(periodStart || ""));
+    if (!startMatch || !/^\d{4}-\d{2}-\d{2}$/.test(String(entry?.date || ""))) return false;
+    const previousDay = new Date(Date.UTC(Number(startMatch[1]), Number(startMatch[2]) - 1, Number(startMatch[3])));
+    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+    const previousISO = `${previousDay.getUTCFullYear()}-${String(previousDay.getUTCMonth() + 1).padStart(2, "0")}-${String(previousDay.getUTCDate()).padStart(2, "0")}`;
+    return entry.date === previousISO;
+  }
+
   function getFifthWeekdayPaymentDate(referenceDate) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(referenceDate || ""));
     if (!match) return "";
@@ -242,5 +252,5 @@
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
-  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
+  return { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, parseMoneyInput, roundMoney, timeToMinutes };
 });

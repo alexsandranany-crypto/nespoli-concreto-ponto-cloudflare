@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 7, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 8, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -39,7 +39,7 @@
     startTime: $("#startTime"), breakStart: $("#breakStart"), breakEnd: $("#breakEnd"), endTime: $("#endTime"),
     valueMode: $("#valueMode"), manualValue: $("#manualValue"), manualReason: $("#manualReason"), notes: $("#notes"), paymentStatus: $("#paymentStatus"),
     paymentStatusField: $("#paymentStatusField"), paymentDateField: $("#paymentDateField"), paymentDate: $("#paymentDate"),
-    timeGrid: $("#timeGrid"), calculationMode: $("#calculationMode"), calcPreview: $("#calcPreview"), absenceFormNotice: $("#absenceFormNotice"),
+    timeGrid: $("#timeGrid"), calculationMode: $("#calculationMode"), calcPreview: $("#calcPreview"), absenceFormNotice: $("#absenceFormNotice"), balanceCarryNotice: $("#balanceCarryNotice"),
     previewHours: $("#previewHours"), previewCalculated: $("#previewCalculated"), previewFinal: $("#previewFinal"), formulaNote: $("#formulaNote"), notesLabel: $("#notesLabel"), entryFormTitle: $("#entryFormTitle"),
     rateHint: $("#rateHint"), adjustmentBox: $("#adjustmentBox"), formError: $("#formError"), formMode: $("#formMode"),
     saveEntryBtn: $("#saveEntryBtn"), cancelEditBtn: $("#cancelEditBtn"), filterEmployee: $("#filterEmployee"), filterStart: $("#filterStart"),
@@ -164,7 +164,7 @@
   }
 
   function normalizeState(data) {
-    data.version = 7;
+    data.version = 8;
     data.advances = Array.isArray(data.advances) ? data.advances : [];
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
@@ -189,9 +189,12 @@
     });
     data.entries = data.entries.map((entry) => {
       const status = entry.status === "paid" ? "paid" : "pending";
+      const valueMode = entry.valueMode === "balance8h" ? "balance8h" : "worked";
       return {
         ...entry,
         recordType: entry.recordType === "absence" ? "absence" : "work",
+        valueMode,
+        carryToNextPeriod: entry.carryToNextPeriod === true || (valueMode === "balance8h" && /-21$/.test(String(entry.date || ""))),
         status,
         paidDate: status === "paid" ? String(entry.paidDate || entry.paymentDate || "") : ""
       };
@@ -401,7 +404,8 @@
     dom.advanceFilterStart.addEventListener("change", renderAdvances);
     dom.advanceFilterEnd.addEventListener("change", renderAdvances);
     $("#clearAdvanceFiltersBtn").addEventListener("click", clearAdvanceFilters);
-    [dom.filterEmployee, dom.filterStart, dom.filterEnd, dom.filterStatus].forEach((input) => input.addEventListener("change", () => { activePeriod = "custom"; updateActiveChips(); renderDashboard(); }));
+    [dom.filterStart, dom.filterEnd].forEach((input) => input.addEventListener("change", () => { activePeriod = "custom"; updateActiveChips(); renderDashboard(); }));
+    [dom.filterEmployee, dom.filterStatus].forEach((input) => input.addEventListener("change", renderDashboard));
     dom.recordsList.addEventListener("click", handleRecordAction);
     dom.employeesList.addEventListener("click", handleEmployeeAction);
     window.addEventListener("online", initializeCloudSync);
@@ -999,7 +1003,12 @@
 
     const existing = state.entries.find((entry) => entry.id === dom.entryId.value);
     const duplicate = state.entries.find((entry) => entry.employeeId === employee.id && entry.date === dom.workDate.value && entry.id !== dom.entryId.value);
-    if (duplicate && !confirm(`${employee.name} já possui ${L.isAbsence(duplicate) ? "uma falta" : "uma jornada"} em ${dateBR(dom.workDate.value)}. Deseja salvar outro registro mesmo assim?`)) return;
+    if (duplicate) {
+      const duplicateMessage = dom.valueMode.value === "balance8h"
+        ? `${employee.name} já possui uma jornada em ${dateBR(dom.workDate.value)}. Este novo registro lançará somente o saldo que passou ou faltou de 8h, sem repetir a diária. Deseja continuar?`
+        : `${employee.name} já possui ${L.isAbsence(duplicate) ? "uma falta" : "uma jornada"} em ${dateBR(dom.workDate.value)}. Deseja salvar outro registro mesmo assim?`;
+      if (!confirm(duplicateMessage)) return;
+    }
 
     const payload = {
       employeeId: employee.id,
@@ -1015,6 +1024,7 @@
       breakEnd: isAbsence ? "" : dom.breakEnd.value,
       end: isAbsence ? "" : dom.endTime.value,
       valueMode: isAbsence ? "worked" : dom.valueMode.value,
+      carryToNextPeriod: !isAbsence && dom.valueMode.value === "balance8h" && /-21$/.test(dom.workDate.value),
       manualValue: isAbsence ? null : calculation.manualValue,
       manualReason: isAbsence ? "" : dom.manualReason.value.trim(),
       notes: dom.notes.value.trim(),
@@ -1053,8 +1063,18 @@
     return { ...L.calculateJourney({ ...entry, ...config, manualValue: entry.manualValue, valueMode: entry.valueMode || "worked" }), ...config };
   }
 
+  function entryMinutesForPayment(entry, calculation) {
+    return entry.valueMode === "balance8h" ? calculation.balanceMinutes : calculation.workedMinutes;
+  }
+
+  function formatPaymentMinutes(minutes) {
+    return Number(minutes) < 0 ? L.formatSignedDuration(minutes) : L.formatDuration(minutes);
+  }
+
   function updatePreview() {
     const employee = getEmployee(dom.employeeSelect.value);
+    const isDay21Balance = dom.recordType.value !== "absence" && dom.valueMode.value === "balance8h" && /-21$/.test(dom.workDate.value);
+    dom.balanceCarryNotice.hidden = !isDay21Balance;
     if (dom.recordType.value === "absence") {
       dom.rateHint.textContent = employee
         ? `Falta de ${employee.name}: sem horas e sem valor calculado.`
@@ -1079,13 +1099,13 @@
       return;
     }
     dom.previewHours.textContent = dom.valueMode.value === "balance8h"
-      ? `${L.formatDuration(result.workedMinutes)} (saldo ${L.formatSignedDuration(result.balanceMinutes)})`
+      ? `Somente ${L.formatSignedDuration(result.balanceMinutes)}`
       : L.formatDuration(result.workedMinutes);
     dom.previewCalculated.textContent = currency.format(result.calculatedValue);
     dom.previewFinal.textContent = currency.format(result.finalValue);
     dom.previewFinal.classList.toggle("negative-text", result.finalValue < 0);
     dom.formulaNote.textContent = dom.valueMode.value === "balance8h"
-      ? `${L.formatDuration(result.workedMinutes)} − 8h = ${L.formatSignedDuration(result.balanceMinutes)}. Saldo: ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`
+      ? `A diária integral já foi paga. ${L.formatDuration(result.workedMinutes)} − 8h = ${L.formatSignedDuration(result.balanceMinutes)}. Será lançado somente ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`
       : result.paymentType === "monthly"
         ? `${currency.format(result.monthlySalary)} ÷ ${result.monthlyHours}h × ${(result.workedMinutes / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}h = ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`
         : `${currency.format(result.dailyRate)} ÷ 8 × ${(result.workedMinutes / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}h = ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`;
@@ -1323,7 +1343,10 @@
       if (employeeFilter !== "all" && entry.employeeId !== employeeFilter) return false;
       if (dom.filterStatus.value === "absence" && !L.isAbsence(entry)) return false;
       if (["paid", "pending"].includes(dom.filterStatus.value) && (L.isAbsence(entry) || entry.status !== dom.filterStatus.value)) return false;
-      if (dom.filterStart.value && entry.date < dom.filterStart.value) return false;
+      const isCarryover = L.isBalanceCarryover(entry, dom.filterStart.value, activePeriod);
+      const belongsToFollowingPeriod = entry.carryToNextPeriod === true || (entry.valueMode === "balance8h" && /-21$/.test(String(entry.date || "")));
+      if (activePeriod === "close20" && belongsToFollowingPeriod) return false;
+      if (dom.filterStart.value && entry.date < dom.filterStart.value && !isCarryover) return false;
       if (dom.filterEnd.value && entry.date > dom.filterEnd.value) return false;
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date) || (a.employeeNameSnapshot || "").localeCompare(b.employeeNameSnapshot || "", "pt-BR"));
@@ -1345,7 +1368,7 @@
     const absences = entries.filter(L.isAbsence);
     const workEntries = entries.filter((entry) => !L.isAbsence(entry));
     const computed = workEntries.map((entry) => ({ entry, calculation: calculateEntry(entry) })).filter((item) => item.calculation.valid);
-    const totalMinutes = computed.reduce((sum, item) => sum + item.calculation.workedMinutes, 0);
+    const totalMinutes = computed.reduce((sum, item) => sum + entryMinutesForPayment(item.entry, item.calculation), 0);
     const grossValue = computed.reduce((sum, item) => sum + item.calculation.finalValue, 0);
     const advancesValue = advances.reduce((sum, advance) => sum + Number(advance.value), 0);
     const netValue = grossValue - advancesValue;
@@ -1361,7 +1384,7 @@
     const pending = outstanding.pendingNet;
     dom.statEmployees.textContent = new Set([...entries.map((entry) => entry.employeeId), ...advances.map((advance) => advance.employeeId)]).size;
     dom.statEntries.textContent = `${workEntries.length} jornada(s) • ${absences.length} falta(s) • ${advances.length} vale(s)`;
-    dom.statHours.textContent = L.formatDuration(totalMinutes);
+    dom.statHours.textContent = formatPaymentMinutes(totalMinutes);
     dom.statTotal.textContent = currency.format(netValue);
     dom.statAdvances.textContent = `Bruto: ${currency.format(grossValue)} • Vales: ${currency.format(advancesValue)}`;
     dom.statPaidNet.textContent = currency.format(paidSummary.paidNet);
@@ -1413,7 +1436,7 @@
       const absenceItems = items.filter(L.isAbsence);
       const workRows = items.filter((entry) => !L.isAbsence(entry)).map((entry) => ({ entry, calc: calculateEntry(entry) })).filter((item) => item.calc.valid);
       const displayRows = items.map((entry) => ({ entry, calc: calculateEntry(entry) })).filter((item) => item.calc.valid);
-      const minutes = workRows.reduce((sum, item) => sum + item.calc.workedMinutes, 0);
+      const minutes = workRows.reduce((sum, item) => sum + entryMinutesForPayment(item.entry, item.calc), 0);
       const gross = workRows.reduce((sum, item) => sum + item.calc.finalValue, 0);
       const advancesTotal = groupAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       const net = gross - advancesTotal;
@@ -1426,7 +1449,7 @@
       return `<section class="employee-group">
         <header class="group-header">
           <div class="group-person"><div class="avatar">${escapeHTML(initials(name))}</div><div class="group-person-copy"><div class="group-person-title"><h3>${escapeHTML(name)}</h3>${workRows.length ? `<span class="group-payment-status ${paymentSummary.status}">${paymentStatusText(paymentSummary)}</span>` : ""}${absenceItems.length ? `<span class="group-absence-status">${absenceItems.length} ${absenceItems.length === 1 ? "falta" : "faltas"}</span>` : ""}</div><small>${workRows.length} jornada(s) • ${absenceItems.length} falta(s) • ${groupAdvances.length} vale(s)</small>${employee?.paySchedule === "monthlyFifthWeekday" ? `<small class="employee-pay-schedule">${escapeHTML(schedule)}</small>` : ""}${paymentActions}</div></div>
-          <div class="group-totals"><div><span>Horas</span><strong>${L.formatDuration(minutes)}</strong></div><div><span>Bruto</span><strong>${currency.format(gross)}</strong></div><div><span>Vales</span><strong>− ${currency.format(advancesTotal)}</strong></div><div><span>Líquido</span><strong>${currency.format(net)}</strong></div></div>
+          <div class="group-totals"><div><span>Horas para pagamento</span><strong>${formatPaymentMinutes(minutes)}</strong></div><div><span>Bruto</span><strong>${currency.format(gross)}</strong></div><div><span>Vales</span><strong>− ${currency.format(advancesTotal)}</strong></div><div><span>Líquido</span><strong>${currency.format(net)}</strong></div></div>
         </header>
         ${displayRows.length ? `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Jornada</th><th>Intervalo</th><th>Horas</th><th>Base de cálculo</th><th>Valor</th><th>Status</th><th>Observação</th><th></th></tr></thead><tbody>${displayRows.map(({ entry, calc }) => renderEntryRow(entry, calc)).join("")}</tbody></table></div>` : ""}
         ${groupAdvances.length ? `<div class="group-advances"><strong>Vales descontados</strong>${groupAdvances.map((advance) => `<span>${dateBR(advance.date)} • ${escapeHTML(advance.note || "Vale/adiantamento")} • <b>− ${currency.format(advance.value)}</b></span>`).join("")}</div>` : ""}
@@ -1447,7 +1470,7 @@
     const manual = calc.manualValue !== null ? `<span class="manual-tag" title="${escapeHTML(entry.manualReason)}">Manual: ${escapeHTML(entry.manualReason || "ajuste")}</span>` : "";
     const balance = entry.valueMode === "balance8h" ? `<span class="manual-tag">Saldo de 8h: ${L.formatSignedDuration(calc.balanceMinutes)}</span>` : "";
     return `<tr>
-      <td><strong>${dateBR(entry.date)}</strong></td><td>${entry.start}–${entry.end}</td><td>${interval}</td><td>${L.formatDuration(calc.workedMinutes)}</td>
+      <td><strong>${dateBR(entry.date)}</strong></td><td>${entry.start}–${entry.end}</td><td>${interval}</td><td>${entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes)}</td>
       <td>${escapeHTML(paymentBaseLabel(calc))}<span class="rate-per-hour">${currency.format(calc.hourlyRate)}/h</span></td><td class="money ${calc.finalValue < 0 ? "negative-text" : ""}">${currency.format(calc.finalValue)}${balance}${manual}</td>
       <td><button class="badge ${entry.status}" data-action="toggle" data-id="${entry.id}" type="button">${entry.status === "paid" ? "Pago" : "Não pago"}</button>${entry.status === "paid" ? `<span class="payment-date">${entry.paidDate ? dateBR(entry.paidDate) : "data não informada"}</span>` : ""}</td>
       <td class="notes-cell" title="${escapeHTML(entry.notes)}">${escapeHTML(entry.notes || "—")}</td>
@@ -1588,13 +1611,14 @@
       const lines = items.sort((a, b) => a.date.localeCompare(b.date)).map((entry) => {
         if (L.isAbsence(entry)) return `• ${dateBR(entry.date)} | *FALTA* | ${entry.notes || "Sem justificativa informada"}`;
         const calc = calculateEntry(entry);
-        subtotal += calc.finalValue; minutes += calc.workedMinutes; grossTotal += calc.finalValue;
+        subtotal += calc.finalValue; minutes += entryMinutesForPayment(entry, calc); grossTotal += calc.finalValue;
         const adjustment = calc.manualValue !== null ? ` • ajuste: ${entry.manualReason || "valor manual"}` : "";
         const balance = entry.valueMode === "balance8h" ? ` • saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : "";
         const paymentLabel = entry.status === "paid"
           ? `Pago${entry.paidDate ? ` em ${dateBR(entry.paidDate)}` : ""}`
           : "Não pago";
-        return `• ${dateBR(entry.date)} | ${entry.start}–${entry.end} | ${L.formatDuration(calc.workedMinutes)} | ${paymentBaseLabel(calc)} | ${currency.format(calc.finalValue)} | ${paymentLabel}${balance}${adjustment}`;
+        const hoursText = entry.valueMode === "balance8h" ? `somente saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : L.formatDuration(calc.workedMinutes);
+        return `• ${dateBR(entry.date)} | ${entry.start}–${entry.end} | ${hoursText} | ${paymentBaseLabel(calc)} | ${currency.format(calc.finalValue)} | ${paymentLabel}${balance}${adjustment}`;
       });
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       advancesTotal += employeeAdvancesTotal;
@@ -1608,7 +1632,7 @@
       const paidLine = employeePaidSummary.latestPaidDate
         ? `\n*Total pago líquido: ${currency.format(employeePaidSummary.paidNet)}* • ${employeePaidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(employeePaidSummary.latestPaidDate)}`
         : "\nTotal pago líquido: R$ 0,00 • ainda não pago";
-      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras: ${L.formatDuration(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
+      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
     });
     const paidDateLine = paidSummary.latestPaidDate ? ` • ${paidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(paidSummary.latestPaidDate)}` : "";
     return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
@@ -1633,7 +1657,7 @@
         }
         const calc = calculateEntry(entry);
         subtotal += calc.finalValue;
-        minutes += calc.workedMinutes;
+        minutes += entryMinutesForPayment(entry, calc);
         if (entry.status === "paid") paidSubtotal += calc.finalValue;
         else pendingSubtotal += calc.finalValue;
         const balance = entry.valueMode === "balance8h" ? `<div class="report-adjustment">Saldo de 8h: ${L.formatSignedDuration(calc.balanceMinutes)}</div>` : "";
@@ -1642,7 +1666,8 @@
           ? `Pago${entry.paidDate ? `<div class="report-payment-date">em ${dateBR(entry.paidDate)}</div>` : ""}`
           : "Não pago";
         const interval = entry.breakStart && entry.breakEnd ? `${entry.breakStart}–${entry.breakEnd}` : "Sem intervalo";
-        return `<tr><td>${dateBR(entry.date)}</td><td>${entry.start}–${entry.end}</td><td>${interval}</td><td>${L.formatDuration(calc.workedMinutes)}</td><td>${escapeHTML(paymentBaseLabel(calc))}<div class="report-adjustment">${currency.format(calc.hourlyRate)}/h</div></td><td>${currency.format(calc.finalValue)}${balance}${adjustment}</td><td>${paymentLabel}</td></tr>`;
+        const hoursText = entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes);
+        return `<tr><td>${dateBR(entry.date)}</td><td>${entry.start}–${entry.end}</td><td>${interval}</td><td>${hoursText}</td><td>${escapeHTML(paymentBaseLabel(calc))}<div class="report-adjustment">${currency.format(calc.hourlyRate)}/h</div></td><td>${currency.format(calc.finalValue)}${balance}${adjustment}</td><td>${paymentLabel}</td></tr>`;
       }).join("");
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
       const advanceRows = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `<tr><td>${dateBR(advance.date)}</td><td>${escapeHTML(advance.note || "Vale/adiantamento")}</td><td>− ${currency.format(advance.value)}</td></tr>`).join("");
@@ -1683,7 +1708,7 @@
         </div>
         ${advanceRows ? `<div class="payslip-block payslip-advances"><h3>Vales / adiantamentos</h3><div class="table-wrap"><table><thead><tr><th>Data do vale</th><th>Descrição</th><th>Desconto</th></tr></thead><tbody>${advanceRows}</tbody></table></div></div>` : ""}
         <div class="payslip-totals">
-          <div><span>Horas trabalhadas</span><strong>${L.formatDuration(minutes)}</strong></div>
+          <div><span>Horas para pagamento</span><strong>${formatPaymentMinutes(minutes)}</strong></div>
           <div><span>Valor bruto</span><strong>${currency.format(subtotal)}</strong></div>
           <div><span>Vales</span><strong>− ${currency.format(employeeAdvancesTotal)}</strong></div>
           <div class="payslip-net"><span>Valor líquido</span><strong>${currency.format(netTotal)}</strong></div>
@@ -1728,7 +1753,7 @@
   }
 
   function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 7, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 8, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
@@ -1760,7 +1785,7 @@
     const data = parsed?.data || parsed;
     if (!Array.isArray(data?.employees) || !Array.isArray(data?.entries)) throw new Error("Formato inválido");
     if (!confirm(`Restaurar este backup com ${data.employees.length} colaborador(es), ${data.entries.length} registro(s) de jornada/falta e ${(data.advances || []).length} vale(s)? Os dados atuais serão substituídos.`)) return false;
-    state = normalizeState({ version: 7, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
+    state = normalizeState({ version: 8, employees: data.employees, entries: data.entries, advances: data.advances || [], updatedAt: new Date().toISOString() });
     saveState();
     resetEntryForm();
     renderAll();

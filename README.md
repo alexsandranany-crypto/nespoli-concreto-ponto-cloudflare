@@ -4,6 +4,8 @@ Aplicativo privado de jornada, pagamentos, vales e fichas cadastrais de colabora
 
 Os atalhos de fechamento separam os ciclos em 22–07 e 08–21, evitando repetir no novo período a diária já encerrada no dia 21.
 
+Quando a diária do dia 21 já tiver sido paga antes do fim da jornada, o modo “Diária já paga” calcula apenas o saldo acima ou abaixo de 8 horas e leva esse saldo para o ciclo 22–07.
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/alexsandranany-crypto/nespoli-concreto-ponto-cloudflare)
 
 ## Implantar

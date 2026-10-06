@@ -57,9 +57,9 @@
           <small id="statEntries">0 lançamentos</small>
         </article>
         <article class="stat-card">
-          <span>Horas trabalhadas</span>
+          <span>Horas para pagamento</span>
           <strong id="statHours">0h00</strong>
-          <small>Intervalos descontados</small>
+          <small>Saldo do dia 21 mostra somente o que passou de 8h</small>
         </article>
         <article class="stat-card">
           <span>Total líquido</span>
@@ -142,10 +142,15 @@
           <div class="field full calculation-mode" id="calculationMode">
             <label for="valueMode">Forma de calcular este lançamento</label>
             <select id="valueMode">
-              <option value="worked">Pagar todas as horas trabalhadas</option>
-              <option value="balance8h">Valor integral já pago — lançar somente o saldo em relação a 8h</option>
+              <option value="worked">Jornada normal — calcular todas as horas</option>
+              <option value="balance8h">Diária já paga — calcular somente o que passou ou faltou de 8h</option>
             </select>
-            <small>Se a jornada for menor que 8h, o saldo aparecerá negativo; se for maior, mostrará apenas as horas extras.</small>
+            <small>Use a segunda opção para o dia 21 que já teve a diária integral paga.</small>
+          </div>
+
+          <div class="balance-carry-notice" id="balanceCarryNotice" hidden>
+            <strong>Saldo do dia 21</strong>
+            <span>A diária completa não será cobrada novamente. Somente as horas acima ou abaixo de 8h entrarão no período seguinte, de 22 a 07.</span>
           </div>
 
           <div class="calc-preview" id="calcPreview" aria-live="polite">
@@ -608,7 +613,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="logic.js?v=19"></script>
-  <script src="app.js?v=19"></script>
+  <script src="logic.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

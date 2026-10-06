@@ -180,6 +180,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-dark); bo
 }
 .absence-form-notice[hidden], .absence-alert[hidden] { display: none; }
 .absence-form-notice strong { flex: 0 0 auto; color: var(--danger); }
+.balance-carry-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -2px 0 16px;
+  padding: 13px 14px;
+  border: 1px solid #e8cf62;
+  border-left: 5px solid var(--accent);
+  border-radius: 11px;
+  background: #fff9dd;
+  color: #5d4b09;
+  font-size: .88rem;
+  line-height: 1.45;
+}
+.balance-carry-notice[hidden] { display: none; }
+.balance-carry-notice strong { flex: 0 0 auto; color: #6a5200; }
 
 .calc-preview { display: grid; grid-template-columns: 1fr 1fr 1.15fr; overflow: hidden; margin-top: 18px; border: 1px solid #dae0e8; border-radius: 12px; background: #f8fafc; }
 .calc-preview > div { padding: 12px; border-right: 1px solid #e1e6ed; }

@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
+const { calculateJourney, formatDuration, formatSignedDuration, resolveRateHistory, summarizePayments, summarizeOutstanding, summarizePaid, isAbsence, getClosePeriod, getCurrentCloseType, isBalanceCarryover, getFifthWeekdayPaymentDate, parseMoneyInput } = require("./logic.js");
 
 assert.equal(parseMoneyInput("18,00"), 18);
 assert.equal(parseMoneyInput("49.99"), 49.99);
@@ -35,6 +35,11 @@ const owedHours = calculateJourney({ start: "06:00", breakStart: "", breakEnd: "
 assert.equal(owedHours.workedMinutes, 406);
 assert.equal(owedHours.balanceMinutes, -74);
 assert.equal(owedHours.finalValue, -18.5);
+
+const paidDailyOvertime = calculateJourney({ start: "07:00", breakStart: "11:00", breakEnd: "13:00", end: "17:20", dailyRate: 150, manualValue: null, valueMode: "balance8h" });
+assert.equal(paidDailyOvertime.workedMinutes, 500);
+assert.equal(paidDailyOvertime.balanceMinutes, 20);
+assert.equal(paidDailyOvertime.finalValue, 6.25);
 assert.equal(formatSignedDuration(owedHours.balanceMinutes), "−1h14");
 
 const negativeManual = calculateJourney({ start: "06:00", breakStart: "", breakEnd: "", end: "12:46", dailyRate: 120, manualValue: -20, valueMode: "balance8h" });
@@ -72,6 +77,9 @@ assert.equal(getCurrentCloseType(new Date(2026, 9, 7)), "close7");
 assert.equal(getCurrentCloseType(new Date(2026, 9, 8)), "close20");
 assert.equal(getCurrentCloseType(new Date(2026, 9, 21)), "close20");
 assert.equal(getCurrentCloseType(new Date(2026, 9, 22)), "close7");
+assert.equal(isBalanceCarryover({ date: "2026-09-21", valueMode: "balance8h" }, "2026-09-22", "close7"), true);
+assert.equal(isBalanceCarryover({ date: "2026-09-21", valueMode: "worked" }, "2026-09-22", "close7"), false);
+assert.equal(isBalanceCarryover({ date: "2026-09-21", valueMode: "balance8h" }, "2026-09-22", "close20"), false);
 assert.equal(getFifthWeekdayPaymentDate("2026-09-21"), "2026-10-07");
 assert.equal(getFifthWeekdayPaymentDate("2026-12-31"), "2027-01-07");
 assert.equal(getFifthWeekdayPaymentDate("data-invalida"), "");
