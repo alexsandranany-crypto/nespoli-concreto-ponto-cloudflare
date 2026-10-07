@@ -439,6 +439,8 @@ td.negative-text { color: var(--danger) !important; }
 .payslip-meta > div:last-child { border-right: 0; }
 .payslip-meta span, .payslip-totals span { color: #5d6470; font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; }
 .payslip-meta strong { overflow-wrap: anywhere; font-size: .78rem; }
+.payslip-pix { display: block; color: #171717; font-size: .72rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.payslip-pix b { font-weight: 900; }
 .payslip-block { padding: 13px 15px 0; }
 .payslip-block h3 { margin: 0 0 7px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
 .payslip-advances { padding-top: 11px; }
@@ -698,6 +700,7 @@ td { padding: 13px; font-size: .9rem; }
   .payslip-meta > div:nth-child(-n + 2), .payslip-totals > div:nth-child(-n + 2) { border-bottom: 1px solid #cecece; }
   .payslip-meta span, .payslip-totals span { font-size: 5.8pt; }
   .payslip-meta strong { font-size: 7pt; }
+  .payslip-pix { font-size: 6.4pt; }
   .payslip-block { padding: 6px 8px 0; }
   .payslip-block h3 { margin-bottom: 3px; font-size: 7pt; }
   .payslip-advances { padding-top: 5px; }
