@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 11, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 12, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -48,7 +48,7 @@
     filterEnd: $("#filterEnd"), filterStatus: $("#filterStatus"), recordsList: $("#recordsList"), emptyState: $("#emptyState"),
     absenceAlert: $("#absenceAlert"), absenceAlertText: $("#absenceAlertText"),
     employeesDialog: $("#employeesDialog"), employeeForm: $("#employeeForm"), employeeId: $("#employeeId"), employeeName: $("#employeeName"),
-    employeeRate: $("#employeeRate"), employeeRateField: $("#employeeRateField"), employeePaymentType: $("#employeePaymentType"),
+    employeeCompany: $("#employeeCompany"), employeeRate: $("#employeeRate"), employeeRateField: $("#employeeRateField"), employeePaymentType: $("#employeePaymentType"),
     employeePaySchedule: $("#employeePaySchedule"),
     employeePhone: $("#employeePhone"), employeeBirthDate: $("#employeeBirthDate"), employeeCpf: $("#employeeCpf"), employeeRg: $("#employeeRg"), employeePis: $("#employeePis"),
     employeeJobTitle: $("#employeeJobTitle"), employeeHireDate: $("#employeeHireDate"), employeeEmploymentStatus: $("#employeeEmploymentStatus"),
@@ -165,12 +165,20 @@
     return ({ checking: "Conta corrente", savings: "Conta poupança", salary: "Conta salário", payment: "Conta de pagamento", other: "Outra" })[value] || "Não informado";
   }
 
+  function employeeCompanyKey(employee) {
+    return employee?.company === "service" ? "service" : "concrete";
+  }
+
+  function employeeCompanyName(employee) {
+    return employeeCompanyKey(employee) === "service" ? "NESPOLI SERVIÇO" : "NESPOLI CONCRETO";
+  }
+
   function normalizeState(data) {
     const sourceVersion = Number(data.version) || 0;
     const aliceEmployeeIds = new Set((Array.isArray(data.employees) ? data.employees : [])
       .filter((employee) => employee.paySchedule === "monthlyFifthWeekday" || textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice"))
       .map((employee) => employee.id));
-    data.version = 11;
+    data.version = 12;
     data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
       const hadStatus = advance.status === "paid" || advance.status === "pending";
       const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
@@ -186,7 +194,8 @@
     });
     data.updatedAt = data.updatedAt || new Date(0).toISOString();
     data.employees = data.employees.map((employee) => {
-      const paymentType = employee.paymentType === "monthly" ? "monthly" : "daily";
+      const company = employee.company === "service" ? "service" : "concrete";
+      const paymentType = company === "service" ? "daily" : employee.paymentType === "monthly" ? "monthly" : "daily";
       const migrateAliceToFifthWeekday = sourceVersion < 10 && textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice");
       const history = Array.isArray(employee.rateHistory) && employee.rateHistory.length
         ? employee.rateHistory
@@ -197,8 +206,9 @@
         .sort((a, b) => a.startDate.localeCompare(b.startDate));
       return {
         ...employee,
+        company,
         paymentType,
-        paySchedule: employee.paySchedule === "monthlyFifthWeekday" || migrateAliceToFifthWeekday ? "monthlyFifthWeekday" : "period",
+        paySchedule: company === "service" ? "period" : employee.paySchedule === "monthlyFifthWeekday" || migrateAliceToFifthWeekday ? "monthlyFifthWeekday" : "period",
         profile: normalizeEmployeeProfile(employee),
         dailyRate: normalizedHistory.at(-1)?.dailyRate || Number(employee.dailyRate) || 0,
         rateHistory: normalizedHistory,
@@ -309,7 +319,7 @@
           await pushCloudState();
           return;
         }
-        if (cloudSourceVersion < 11 && hasBusinessData(state)) {
+        if (cloudSourceVersion < 12 && hasBusinessData(state)) {
           state.updatedAt = new Date().toISOString();
           persistLocalState();
           await pushCloudState();
@@ -419,6 +429,7 @@
     dom.entryForm.addEventListener("submit", saveEntry);
     dom.cancelEditBtn.addEventListener("click", resetEntryForm);
     dom.employeeForm.addEventListener("submit", saveEmployee);
+    dom.employeeCompany.addEventListener("change", updateEmployeePaymentFields);
     dom.employeePaymentType.addEventListener("change", updateEmployeePaymentFields);
     dom.cancelEmployeeEditBtn.addEventListener("click", resetEmployeeForm);
     dom.editEmployeeProfileBtn.addEventListener("click", editEmployeeFromProfile);
@@ -467,6 +478,7 @@
     const profile = normalizeEmployeeProfile(employee);
     dom.employeeId.value = employee.id;
     dom.employeeName.value = employee.name;
+    dom.employeeCompany.value = employeeCompanyKey(employee);
     dom.employeePhone.value = profile.phone;
     dom.employeeBirthDate.value = profile.birthDate;
     dom.employeeCpf.value = profile.cpf;
@@ -505,11 +517,12 @@
     event.preventDefault();
     hideError(dom.employeeError);
     const name = dom.employeeName.value.trim();
-    const paymentType = dom.employeePaymentType.value === "monthly" ? "monthly" : "daily";
+    const company = dom.employeeCompany.value === "service" ? "service" : "concrete";
+    const paymentType = company === "service" ? "daily" : dom.employeePaymentType.value === "monthly" ? "monthly" : "daily";
     const rate = Number(dom.employeeRate.value);
     const monthlySalary = Number(dom.employeeMonthlySalary.value);
     const monthlyHours = Number(dom.employeeMonthlyHours.value);
-    const paySchedule = dom.employeePaySchedule.value === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
+    const paySchedule = company === "service" ? "period" : dom.employeePaySchedule.value === "monthlyFifthWeekday" ? "monthlyFifthWeekday" : "period";
     const profile = {
       phone: formatPhone(dom.employeePhone.value),
       birthDate: textValue(dom.employeeBirthDate.value),
@@ -563,6 +576,7 @@
         }
         Object.assign(employee, {
           name,
+          company,
           paymentType,
           paySchedule,
           profile,
@@ -577,6 +591,7 @@
       const employee = {
         id: uid(),
         name,
+        company,
         paymentType,
         paySchedule,
         profile,
@@ -653,6 +668,7 @@
         ${profileDataItem("Data de nascimento", profile.birthDate ? dateBR(profile.birthDate) : "")}
       </div></section>
       <section class="profile-card"><h3>Dados profissionais</h3><div class="profile-data-grid">
+        ${profileDataItem("Empresa", employeeCompanyName(employee), true)}
         ${profileDataItem("Função / cargo", profile.employment.jobTitle, true)}
         ${profileDataItem("Data de admissão / início", profile.employment.hireDate ? dateBR(profile.employment.hireDate) : "")}
         ${profileDataItem("Situação", profile.employment.status === "inactive" ? "Inativo" : "Ativo")}
@@ -698,6 +714,7 @@
   function resetEmployeeForm() {
     dom.employeeForm.reset();
     dom.employeeId.value = "";
+    dom.employeeCompany.value = "concrete";
     dom.employeePaymentType.value = "daily";
     dom.employeePaySchedule.value = "period";
     dom.employeeMonthlyHours.value = "220";
@@ -708,7 +725,14 @@
   }
 
   function updateEmployeePaymentFields() {
-    const isMonthly = dom.employeePaymentType.value === "monthly";
+    const isService = dom.employeeCompany.value === "service";
+    if (isService) {
+      dom.employeePaymentType.value = "daily";
+      dom.employeePaySchedule.value = "period";
+    }
+    dom.employeePaymentType.disabled = isService;
+    dom.employeePaySchedule.disabled = isService;
+    const isMonthly = !isService && dom.employeePaymentType.value === "monthly";
     dom.employeeRateField.hidden = isMonthly;
     dom.employeeRate.disabled = isMonthly;
     dom.employeeRate.required = !isMonthly;
@@ -1400,14 +1424,14 @@
     const currentAdvanceFilter = dom.advanceFilterEmployee.value;
     const options = [...state.employees].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     dom.employeeSelect.innerHTML = options.length
-      ? '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)} — ${escapeHTML(paymentBaseLabel(currentPaymentConfig(employee, dom.workDate.value || todayISO())))}</option>`).join("")
+      ? '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)} — ${escapeHTML(employeeCompanyName(employee))} — ${escapeHTML(paymentBaseLabel(currentPaymentConfig(employee, dom.workDate.value || todayISO())))}</option>`).join("")
       : '<option value="">Cadastre um colaborador</option>';
     renderMainEmployeeFilter(currentFilter);
-    dom.advanceEmployee.innerHTML = '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)}</option>`).join("");
+    dom.advanceEmployee.innerHTML = '<option value="">Selecione</option>' + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)} — ${escapeHTML(employeeCompanyName(employee))}</option>`).join("");
     if (options.some((employee) => employee.id === currentEntry)) dom.employeeSelect.value = currentEntry;
     if (options.some((employee) => employee.id === currentAdvance)) dom.advanceEmployee.value = currentAdvance;
     dom.advanceFilterEmployee.value = options.some((employee) => employee.id === currentAdvanceFilter) ? currentAdvanceFilter : "all";
-    dom.advanceFilterEmployees.innerHTML = `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="all"><span class="advance-radio-mark" aria-hidden="true"></span><span>Todos os colaboradores</span></label>${options.map((employee) => `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="${escapeHTML(employee.id)}"><span class="advance-radio-mark" aria-hidden="true"></span><span>${escapeHTML(employee.name)}</span></label>`).join("")}`;
+    dom.advanceFilterEmployees.innerHTML = `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="all"><span class="advance-radio-mark" aria-hidden="true"></span><span>Todos os colaboradores</span></label>${options.map((employee) => `<label class="advance-employee-option"><input type="radio" name="advanceEmployeeView" value="${escapeHTML(employee.id)}"><span class="advance-radio-mark" aria-hidden="true"></span><span>${escapeHTML(employee.name)} — ${escapeHTML(employeeCompanyName(employee))}</span></label>`).join("")}`;
     updateAdvanceEmployeeFilterButtons();
   }
 
@@ -1421,7 +1445,7 @@
       .filter((employee) => employeeMatchesPayGroup(employee.id))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     dom.filterEmployee.innerHTML = '<option value="all">Todos deste grupo</option>'
-      + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)}</option>`).join("");
+      + options.map((employee) => `<option value="${employee.id}">${escapeHTML(employee.name)} — ${escapeHTML(employeeCompanyName(employee))}</option>`).join("");
     dom.filterEmployee.value = options.some((employee) => employee.id === preferredEmployeeId) ? preferredEmployeeId : "all";
   }
 
@@ -1439,7 +1463,7 @@
       const profile = normalizeEmployeeProfile(employee);
       const profileComplete = isEmployeeProfileComplete(employee);
       const contactSummary = [profile.phone, profile.address.city && profile.address.state ? `${profile.address.city}/${profile.address.state}` : profile.address.city].filter(Boolean).join(" • ");
-      const professionalSummary = [profile.employment.jobTitle, profile.employment.status === "inactive" ? "Inativo" : "Ativo"].filter(Boolean).join(" • ");
+      const professionalSummary = [employeeCompanyName(employee), profile.employment.jobTitle, profile.employment.status === "inactive" ? "Inativo" : "Ativo"].filter(Boolean).join(" • ");
       return `<div class="employee-item">
         <div class="employee-info"><strong>${escapeHTML(employee.name)}</strong><small>${summary} • ${journeyCount} jornada(s) • ${absenceCount} falta(s)</small><small>${escapeHTML(professionalSummary)}</small>${contactSummary ? `<small>${escapeHTML(contactSummary)}</small>` : ""}<small class="employee-pay-schedule">${escapeHTML(schedule)}</small><span class="employee-profile-status${profileComplete ? " complete" : ""}">${profileComplete ? "Ficha preenchida" : "Completar cadastro"}</span></div>
         <div class="employee-actions">
@@ -1651,14 +1675,19 @@
     const entries = getFilteredEntries("all");
     const advances = getFilteredAdvances("all");
     const groups = groupForReport(entries, advances);
-    const reportEmployees = new Map(state.employees.filter((employee) => employeeMatchesPayGroup(employee.id)).map((employee) => [employee.id, employee.name]));
-    groups.forEach((group) => { if (!reportEmployees.has(group.employeeId)) reportEmployees.set(group.employeeId, group.name); });
+    const reportEmployees = new Map(state.employees.filter((employee) => employeeMatchesPayGroup(employee.id)).map((employee) => [employee.id, { name: employee.name, companyName: employeeCompanyName(employee) }]));
+    groups.forEach((group) => {
+      if (!reportEmployees.has(group.employeeId)) {
+        const employee = getEmployee(group.employeeId);
+        reportEmployees.set(group.employeeId, { name: group.name, companyName: employeeCompanyName(employee) });
+      }
+    });
     const employeeOptions = [...reportEmployees.entries()]
-      .map(([employeeId, name]) => ({ employeeId, name }))
+      .map(([employeeId, details]) => ({ employeeId, ...details }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     dom.reportEmployeeSelect.innerHTML = '<option value="">Selecione um colaborador</option>'
       + (employeeOptions.length > 1 ? '<option value="all">Todos — uma folha por colaborador</option>' : "")
-      + employeeOptions.map((employee) => `<option value="${escapeHTML(employee.employeeId)}">${escapeHTML(employee.name)}</option>`).join("");
+      + employeeOptions.map((employee) => `<option value="${escapeHTML(employee.employeeId)}">${escapeHTML(employee.name)} — ${escapeHTML(employee.companyName)}</option>`).join("");
     const mainSelectedEmployee = dom.filterEmployee.value !== "all" ? dom.filterEmployee.value : "";
     dom.reportEmployeeSelect.value = employeeOptions.some((employee) => employee.employeeId === mainSelectedEmployee)
       ? mainSelectedEmployee
@@ -1724,7 +1753,7 @@
   }
 
   function buildWhatsappText(entries, advances) {
-    if (!entries.length && !advances.length) return `*NESPOLI CONCRETO*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
+    if (!entries.length && !advances.length) return `*NESPOLI — CONTROLES DE ACESSO E PAGAMENTOS*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
     const outstandingItems = entries.filter((entry) => !L.isAbsence(entry)).map((entry) => {
       const calc = calculateEntry(entry);
       return { employeeId: entry.employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
@@ -1752,6 +1781,7 @@
       const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"} | ${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "Não pago"}`);
       const employee = getEmployee(employeeId);
       const pixKey = normalizeEmployeeProfile(employee).bank.pixKey;
+      const companyLine = `\nEmpresa: ${employeeCompanyName(employee)}`;
       const pixLine = `\nPIX: ${pixKey || "não cadastrado"}`;
       const scheduleLine = employee?.paySchedule === "monthlyFifthWeekday" ? `\n${paymentScheduleLabel(employee, items)}` : "";
       const employeePaidSummary = L.summarizePaid(items.filter((entry) => !L.isAbsence(entry)).map((entry) => {
@@ -1761,10 +1791,10 @@
       const paidLine = employeePaidSummary.latestPaidDate
         ? `\n*Total pago líquido: ${currency.format(employeePaidSummary.paidNet)}* • ${employeePaidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(employeePaidSummary.latestPaidDate)}`
         : "\nTotal pago líquido: R$ 0,00 • ainda não pago";
-      return `*${name}*${pixLine}${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
+      return `*${name}*${companyLine}${pixLine}${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
     });
     const paidDateLine = paidSummary.latestPaidDate ? ` • ${paidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(paidSummary.latestPaidDate)}` : "";
-    return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
+    return `*NESPOLI — CONTROLES DE ACESSO E PAGAMENTOS*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
   }
 
   function buildPrintableReport(entries, advances) {
@@ -1813,6 +1843,11 @@
         ? `${paidNetSummary.paymentDates.length > 1 ? "Último pagamento" : "Pagamento"}: ${dateBR(paidNetSummary.latestPaidDate)}`
         : "Nenhum pagamento registrado";
       const employee = getEmployee(employeeId);
+      const companyKey = employeeCompanyKey(employee);
+      const companyName = employeeCompanyName(employee);
+      const companyLogo = companyKey === "service"
+        ? '<div class="payslip-logo payslip-logo-service" aria-label="Nespoli Serviço"><span>NS</span></div>'
+        : '<div class="payslip-logo"><img src="logo-nespoli-concreto.png" alt="Nespoli Concreto"></div>';
       const pixKey = normalizeEmployeeProfile(employee).bank.pixKey;
       const schedule = paymentScheduleLabel(employee, items);
       const statusLabel = workItems.length
@@ -1823,8 +1858,8 @@
       const densityClass = reportRowCount > 22 ? " print-ultra-compact" : reportRowCount > 14 ? " print-compact" : "";
 
       return `<section class="payslip${lastClass}${densityClass}">
-        <header class="payslip-header">
-          <div class="payslip-company"><div class="payslip-logo"><img src="logo-nespoli-concreto.png" alt="Nespoli Concreto"></div><div><strong>NESPOLI CONCRETO</strong><span>Controle de acesso e pagamentos</span></div></div>
+        <header class="payslip-header company-${companyKey}">
+          <div class="payslip-company">${companyLogo}<div><strong>${escapeHTML(companyName)}</strong><span>Controle de acesso e pagamentos</span></div></div>
           <div class="payslip-heading"><span>Relatório individual</span><strong>ACESSO E PAGAMENTOS</strong></div>
         </header>
         <div class="payslip-meta">
@@ -1868,23 +1903,28 @@
 
   function exportCSV() {
     const { entries, advances } = getReportData();
-    const lines = [["Tipo", "Colaborador", "Data", "Entrada", "Saída intervalo", "Retorno", "Saída final", "Horas líquidas", "Saldo em relação a 8h", "Forma de pagamento", "Base de cálculo", "Valor por hora", "Valor calculado", "Valor final", "Ajuste", "Motivo do ajuste", "Status", "Data do pagamento", "Observação"]];
+    const lines = [["Tipo", "Colaborador", "Empresa", "Data", "Entrada", "Saída intervalo", "Retorno", "Saída final", "Horas líquidas", "Saldo em relação a 8h", "Forma de pagamento", "Base de cálculo", "Valor por hora", "Valor calculado", "Valor final", "Ajuste", "Motivo do ajuste", "Status", "Data do pagamento", "Observação"]];
     entries.forEach((entry) => {
+      const employee = getEmployee(entry.employeeId);
+      const companyName = employeeCompanyName(employee);
       if (L.isAbsence(entry)) {
-        lines.push(["FALTA", displayEmployeeName(entry.employeeId, entry), dateBR(entry.date), "", "", "", "", "0h00", "", "", "", "", "0.00", "0.00", "", "", "Falta registrada", "", entry.notes || "Sem justificativa informada"]);
+        lines.push(["FALTA", displayEmployeeName(entry.employeeId, entry), companyName, dateBR(entry.date), "", "", "", "", "0h00", "", "", "", "", "0.00", "0.00", "", "", "Falta registrada", "", entry.notes || "Sem justificativa informada"]);
         return;
       }
       const calc = calculateEntry(entry);
-      lines.push([entry.valueMode === "balance8h" ? "SALDO DE HORAS" : "JORNADA", displayEmployeeName(entry.employeeId, entry), dateBR(entry.date), entry.start, entry.breakStart || "", entry.breakEnd || "", entry.end, L.formatDuration(calc.workedMinutes), entry.valueMode === "balance8h" ? L.formatSignedDuration(calc.balanceMinutes) : "", calc.paymentType === "monthly" ? "Mensalista" : "Diária", calc.paymentType === "monthly" ? calc.monthlySalary.toFixed(2) : calc.dailyRate.toFixed(2), calc.hourlyRate.toFixed(2), calc.calculatedValue.toFixed(2), calc.finalValue.toFixed(2), calc.adjustment.toFixed(2), entry.manualReason || "", entry.status === "paid" ? "Pago" : "Não pago", entry.paidDate ? dateBR(entry.paidDate) : "", entry.notes || ""]);
+      lines.push([entry.valueMode === "balance8h" ? "SALDO DE HORAS" : "JORNADA", displayEmployeeName(entry.employeeId, entry), companyName, dateBR(entry.date), entry.start, entry.breakStart || "", entry.breakEnd || "", entry.end, L.formatDuration(calc.workedMinutes), entry.valueMode === "balance8h" ? L.formatSignedDuration(calc.balanceMinutes) : "", calc.paymentType === "monthly" ? "Mensalista" : "Diária", calc.paymentType === "monthly" ? calc.monthlySalary.toFixed(2) : calc.dailyRate.toFixed(2), calc.hourlyRate.toFixed(2), calc.calculatedValue.toFixed(2), calc.finalValue.toFixed(2), calc.adjustment.toFixed(2), entry.manualReason || "", entry.status === "paid" ? "Pago" : "Não pago", entry.paidDate ? dateBR(entry.paidDate) : "", entry.notes || ""]);
     });
-    advances.forEach((advance) => lines.push(["VALE", displayEmployeeName(advance.employeeId, advance), dateBR(advance.date), "", "", "", "", "", "", "", "", "", "", (-Number(advance.value)).toFixed(2), "", "", advance.status === "paid" ? "Pago/descontado" : "Não pago", advance.paidDate ? dateBR(advance.paidDate) : "", advance.note || "Vale/adiantamento"]));
+    advances.forEach((advance) => {
+      const employee = getEmployee(advance.employeeId);
+      lines.push(["VALE", displayEmployeeName(advance.employeeId, advance), employeeCompanyName(employee), dateBR(advance.date), "", "", "", "", "", "", "", "", "", "", (-Number(advance.value)).toFixed(2), "", "", advance.status === "paid" ? "Pago/descontado" : "Não pago", advance.paidDate ? dateBR(advance.paidDate) : "", advance.note || "Vale/adiantamento"]);
+    });
     const csv = "\uFEFF" + lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n");
-    downloadBlob(csv, `relatorio-nespoli-concreto-${todayISO()}.csv`, "text/csv;charset=utf-8");
+    downloadBlob(csv, `relatorio-nespoli-${todayISO()}.csv`, "text/csv;charset=utf-8");
     toast("Planilha CSV baixada.");
   }
 
-  function backupPayload() {
-    return { app: "Nespoli Concreto — Ponto e Pagamentos", backupVersion: 11, exportedAt: new Date().toISOString(), data: state };
+    function backupPayload() {
+    return { app: "Nespoli — Ponto e Pagamentos", backupVersion: 12, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
