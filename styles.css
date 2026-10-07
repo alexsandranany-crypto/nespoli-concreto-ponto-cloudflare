@@ -429,6 +429,9 @@ td.negative-text { color: var(--danger) !important; }
 .payslip-company { display: flex; align-items: center; gap: 12px; }
 .payslip-logo { width: 100px; height: 54px; overflow: hidden; border-radius: 7px; background: #fff; }
 .payslip-logo img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.payslip-logo-service { display: grid; place-items: center; background: #fff; }
+.payslip-logo-service span { color: #111 !important; font-size: 1.35rem !important; font-weight: 950; letter-spacing: -.05em !important; line-height: 1; }
+.payslip-header.company-service { border-bottom-color: #19c84a; }
 .payslip-company > div:last-child, .payslip-heading { display: grid; gap: 3px; }
 .payslip-company strong { font-size: 1rem; letter-spacing: .04em; }
 .payslip-company span, .payslip-heading span { color: #d1d5db; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
