@@ -1751,6 +1751,8 @@
       advancesTotal += employeeAdvancesTotal;
       const advanceLines = employeeAdvances.sort((a, b) => a.date.localeCompare(b.date)).map((advance) => `• VALE ${dateBR(advance.date)} | − ${currency.format(advance.value)} | ${advance.note || "Vale/adiantamento"} | ${advance.status === "paid" ? `Pago/descontado${advance.paidDate ? ` em ${dateBR(advance.paidDate)}` : ""}` : "Não pago"}`);
       const employee = getEmployee(employeeId);
+      const pixKey = normalizeEmployeeProfile(employee).bank.pixKey;
+      const pixLine = `\nPIX: ${pixKey || "não cadastrado"}`;
       const scheduleLine = employee?.paySchedule === "monthlyFifthWeekday" ? `\n${paymentScheduleLabel(employee, items)}` : "";
       const employeePaidSummary = L.summarizePaid(items.filter((entry) => !L.isAbsence(entry)).map((entry) => {
         const calc = calculateEntry(entry);
@@ -1759,7 +1761,7 @@
       const paidLine = employeePaidSummary.latestPaidDate
         ? `\n*Total pago líquido: ${currency.format(employeePaidSummary.paidNet)}* • ${employeePaidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(employeePaidSummary.latestPaidDate)}`
         : "\nTotal pago líquido: R$ 0,00 • ainda não pago";
-      return `*${name}*${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
+      return `*${name}*${pixLine}${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
     });
     const paidDateLine = paidSummary.latestPaidDate ? ` • ${paidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(paidSummary.latestPaidDate)}` : "";
     return `*NESPOLI CONCRETO*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
@@ -1811,6 +1813,7 @@
         ? `${paidNetSummary.paymentDates.length > 1 ? "Último pagamento" : "Pagamento"}: ${dateBR(paidNetSummary.latestPaidDate)}`
         : "Nenhum pagamento registrado";
       const employee = getEmployee(employeeId);
+      const pixKey = normalizeEmployeeProfile(employee).bank.pixKey;
       const schedule = paymentScheduleLabel(employee, items);
       const statusLabel = workItems.length
         ? paymentStatusText(paymentSummary)
@@ -1825,7 +1828,7 @@
           <div class="payslip-heading"><span>Relatório individual</span><strong>ACESSO E PAGAMENTOS</strong></div>
         </header>
         <div class="payslip-meta">
-          <div><span>Colaborador</span><strong>${escapeHTML(name)}</strong></div>
+          <div><span>Colaborador</span><strong>${escapeHTML(name)}</strong><small class="payslip-pix"><b>PIX:</b> ${escapeHTML(pixKey || "não cadastrado")}</small></div>
           <div><span>Período</span><strong>${reportPeriodText()}</strong></div>
           <div><span>Situação</span><strong>${statusLabel}</strong></div>
           <div><span>Emitido em</span><strong>${generatedAt}</strong></div>
