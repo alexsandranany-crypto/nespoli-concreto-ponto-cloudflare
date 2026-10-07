@@ -302,6 +302,14 @@
         <div class="employee-form-section-heading"><div><h3>Dados profissionais</h3><p>Função, admissão e situação do colaborador</p></div></div>
         <div class="employee-profile-grid three-columns">
           <div class="field">
+            <label for="employeeCompany">Empresa</label>
+            <select id="employeeCompany" required>
+              <option value="concrete">Nespoli Concreto</option>
+              <option value="service">Nespoli Serviço</option>
+            </select>
+            <small class="field-hint">Na Nespoli Serviço, o pagamento é sempre por diária.</small>
+          </div>
+          <div class="field">
             <label for="employeeJobTitle">Função / cargo</label>
             <input id="employeeJobTitle" type="text" maxlength="80" placeholder="Ex.: Auxiliar de produção">
           </div>
@@ -457,7 +465,7 @@
       <div><p class="eyebrow accent">FICHA CADASTRAL</p><h2 id="employeeProfileName">Colaborador</h2></div>
       <button class="close-btn" data-close="employeeProfileDialog" type="button" aria-label="Fechar">×</button>
     </div>
-    <div class="profile-private-note"><strong>Dados privados</strong><span>Documentos, endereço e conta bancária não aparecem nos relatórios de pagamento nem no texto do WhatsApp.</span></div>
+    <div class="profile-private-note"><strong>Dados privados</strong><span>Documentos e endereço não aparecem nos relatórios. A chave PIX aparece somente no relatório de pagamento e no texto preparado para WhatsApp.</span></div>
     <div id="employeeProfileContent" class="employee-profile-content"></div>
     <div class="employee-profile-actions">
       <button class="btn btn-primary" id="editEmployeeProfileBtn" type="button">Editar cadastro</button>
