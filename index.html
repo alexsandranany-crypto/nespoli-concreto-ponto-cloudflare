@@ -118,6 +118,7 @@
             <label for="recordType">O que aconteceu neste dia?</label>
             <select id="recordType">
               <option value="work">Trabalhou — registrar horários</option>
+              <option id="fullDailyOption" value="fullDaily" hidden disabled>Diária completa — sem informar horários</option>
               <option value="absence">Faltou — registrar falta</option>
             </select>
           </div>
@@ -125,6 +126,11 @@
           <div class="absence-form-notice" id="absenceFormNotice" hidden>
             <strong>Falta</strong>
             <span>O colaborador ficará marcado como ausente nesta data, sem horas e sem valor calculado.</span>
+          </div>
+
+          <div class="full-daily-form-notice" id="fullDailyFormNotice" hidden>
+            <strong>Diária completa</strong>
+            <span>Exclusivo da Nespoli Serviço: salva uma diária integral sem exigir entrada, intervalo ou saída.</span>
           </div>
 
           <div class="time-grid" id="timeGrid">
