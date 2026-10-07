@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 13, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 14, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -37,7 +37,7 @@
     close7Range: $("#close7Range"), close20Range: $("#close20Range"), statEmployees: $("#statEmployees"), statEntries: $("#statEntries"),
     statHours: $("#statHours"), statTotal: $("#statTotal"), statAdvances: $("#statAdvances"), statPending: $("#statPending"),
     statPaidNet: $("#statPaidNet"), statPaidDetails: $("#statPaidDetails"), statPendingDetails: $("#statPendingDetails"),
-    entryForm: $("#entryForm"), entryId: $("#entryId"), employeeSelect: $("#employeeSelect"), workDate: $("#workDate"), recordType: $("#recordType"), fullDailyOption: $("#fullDailyOption"),
+    entryForm: $("#entryForm"), entryId: $("#entryId"), employeeSelect: $("#employeeSelect"), workDate: $("#workDate"), recordType: $("#recordType"), fullDailyOption: $("#fullDailyOption"), halfDailyOption: $("#halfDailyOption"),
     startTime: $("#startTime"), breakStart: $("#breakStart"), breakEnd: $("#breakEnd"), endTime: $("#endTime"),
     valueMode: $("#valueMode"), manualValue: $("#manualValue"), manualReason: $("#manualReason"), notes: $("#notes"), paymentStatus: $("#paymentStatus"),
     paymentStatusField: $("#paymentStatusField"), paymentDateField: $("#paymentDateField"), paymentDate: $("#paymentDate"),
@@ -178,7 +178,7 @@
     const aliceEmployeeIds = new Set((Array.isArray(data.employees) ? data.employees : [])
       .filter((employee) => employee.paySchedule === "monthlyFifthWeekday" || textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice"))
       .map((employee) => employee.id));
-    data.version = 13;
+    data.version = 14;
     data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
       const hadStatus = advance.status === "paid" || advance.status === "pending";
       const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
@@ -218,7 +218,7 @@
     });
     data.entries = data.entries.map((entry) => {
       const status = entry.status === "paid" ? "paid" : "pending";
-      const valueMode = entry.valueMode === "fullDaily" ? "fullDaily" : entry.valueMode === "balance8h" ? "balance8h" : "worked";
+      const valueMode = entry.valueMode === "halfDaily" ? "halfDaily" : entry.valueMode === "fullDaily" ? "fullDaily" : entry.valueMode === "balance8h" ? "balance8h" : "worked";
       return {
         ...entry,
         recordType: entry.recordType === "absence" ? "absence" : "work",
@@ -319,7 +319,7 @@
           await pushCloudState();
           return;
         }
-        if (cloudSourceVersion < 13 && hasBusinessData(state)) {
+        if (cloudSourceVersion < 14 && hasBusinessData(state)) {
           state.updatedAt = new Date().toISOString();
           persistLocalState();
           await pushCloudState();
@@ -1105,7 +1105,9 @@
     const recordType = selectedRecordType === "absence" ? "absence" : "work";
     const isAbsence = recordType === "absence";
     const isFullDaily = selectedRecordType === "fullDaily";
-    if (isFullDaily && employeeCompanyKey(employee) !== "service") {
+    const isHalfDaily = selectedRecordType === "halfDaily";
+    const isDailyWithoutTimes = isFullDaily || isHalfDaily;
+    if (isDailyWithoutTimes && employeeCompanyKey(employee) !== "service") {
       return showError(dom.formError, "A diária sem horários está disponível somente para a Nespoli Serviço.");
     }
     const config = currentPaymentConfig(employee, dom.workDate.value);
@@ -1122,9 +1124,11 @@
     const existing = state.entries.find((entry) => entry.id === dom.entryId.value);
     const duplicate = state.entries.find((entry) => entry.employeeId === employee.id && entry.date === dom.workDate.value && entry.id !== dom.entryId.value);
     if (duplicate) {
-      const duplicateMessage = isFullDaily
-        ? `${employee.name} já possui um registro em ${dateBR(dom.workDate.value)}. Deseja salvar outra diária completa mesmo assim?`
-        : dom.valueMode.value === "balance8h"
+      const duplicateMessage = isHalfDaily
+        ? `${employee.name} já possui um registro em ${dateBR(dom.workDate.value)}. Deseja salvar outra meia diária mesmo assim?`
+        : isFullDaily
+          ? `${employee.name} já possui um registro em ${dateBR(dom.workDate.value)}. Deseja salvar outra diária completa mesmo assim?`
+          : dom.valueMode.value === "balance8h"
         ? `${employee.name} já possui uma jornada em ${dateBR(dom.workDate.value)}. Este novo registro lançará somente o saldo que passou ou faltou de 8h, sem repetir a diária. Deseja continuar?`
         : `${employee.name} já possui ${L.isAbsence(duplicate) ? "uma falta" : "uma jornada"} em ${dateBR(dom.workDate.value)}. Deseja salvar outro registro mesmo assim?`;
       if (!confirm(duplicateMessage)) return;
@@ -1139,11 +1143,11 @@
       monthlySalarySnapshot: calculation.monthlySalary,
       monthlyHoursSnapshot: calculation.monthlyHours,
       date: dom.workDate.value,
-      start: isAbsence || isFullDaily ? "" : dom.startTime.value,
-      breakStart: isAbsence || isFullDaily ? "" : dom.breakStart.value,
-      breakEnd: isAbsence || isFullDaily ? "" : dom.breakEnd.value,
-      end: isAbsence || isFullDaily ? "" : dom.endTime.value,
-      valueMode: isAbsence ? "worked" : isFullDaily ? "fullDaily" : dom.valueMode.value,
+      start: isAbsence || isDailyWithoutTimes ? "" : dom.startTime.value,
+      breakStart: isAbsence || isDailyWithoutTimes ? "" : dom.breakStart.value,
+      breakEnd: isAbsence || isDailyWithoutTimes ? "" : dom.breakEnd.value,
+      end: isAbsence || isDailyWithoutTimes ? "" : dom.endTime.value,
+      valueMode: isAbsence ? "worked" : isHalfDaily ? "halfDaily" : isFullDaily ? "fullDaily" : dom.valueMode.value,
       carryToNextPeriod: !isAbsence && dom.valueMode.value === "balance8h" && /-21$/.test(dom.workDate.value),
       manualValue: isAbsence ? null : calculation.manualValue,
       manualReason: isAbsence ? "" : dom.manualReason.value.trim(),
@@ -1158,24 +1162,24 @@
     const wasEditing = Boolean(existing);
     resetEntryForm();
     renderAll();
-    toast(wasEditing ? "Registro atualizado." : isAbsence ? "Falta registrada com sucesso." : isFullDaily ? "Diária salva com sucesso." : "Jornada salva com sucesso.");
+    toast(wasEditing ? "Registro atualizado." : isAbsence ? "Falta registrada com sucesso." : isHalfDaily ? "Meia diária salva com sucesso." : isFullDaily ? "Diária salva com sucesso." : "Jornada salva com sucesso.");
   }
 
-  function calculateFullDaily(config, manualInput = "") {
+  function calculateDailyFraction(config, manualInput = "", fraction = 1) {
     const dailyRate = Number(config.dailyRate) || 0;
     const manualText = String(manualInput ?? "").trim().replace(",", ".");
     const manualValue = manualText === "" ? null : Number(manualText);
     if (config.paymentType !== "daily" || dailyRate <= 0) {
-      return { valid: false, error: "A diária completa está disponível somente para colaborador da Nespoli Serviço com diária válida.", ...config };
+      return { valid: false, error: "A diária sem horários está disponível somente para colaborador da Nespoli Serviço com diária válida.", ...config };
     }
     if (manualValue !== null && !Number.isFinite(manualValue)) {
       return { valid: false, error: "Informe um valor manual válido.", ...config };
     }
-    const calculatedValue = L.roundMoney(dailyRate);
+    const calculatedValue = L.roundMoney(dailyRate * fraction);
     const finalValue = manualValue === null ? calculatedValue : L.roundMoney(manualValue);
     return {
       valid: true,
-      workedMinutes: 480,
+      workedMinutes: fraction === 0.5 ? 240 : 480,
       balanceMinutes: 0,
       calculatedValue,
       finalValue,
@@ -1186,9 +1190,18 @@
     };
   }
 
+  function calculateFullDaily(config, manualInput = "") {
+    return calculateDailyFraction(config, manualInput, 1);
+  }
+
+  function calculateHalfDaily(config, manualInput = "") {
+    return calculateDailyFraction(config, manualInput, 0.5);
+  }
+
   function currentCalculation(employee = getEmployee(dom.employeeSelect.value)) {
     const config = currentPaymentConfig(employee, dom.workDate.value || todayISO());
     if (dom.recordType.value === "fullDaily") return calculateFullDaily(config, dom.manualValue.value);
+    if (dom.recordType.value === "halfDaily") return calculateHalfDaily(config, dom.manualValue.value);
     const result = L.calculateJourney({
       start: dom.startTime.value,
       breakStart: dom.breakStart.value,
@@ -1207,6 +1220,7 @@
       return { valid: true, isAbsence: true, workedMinutes: 0, balanceMinutes: 0, calculatedValue: 0, finalValue: 0, manualValue: null, adjustment: 0, hourlyRate: 0, ...config };
     }
     if (entry.valueMode === "fullDaily") return calculateFullDaily(config, entry.manualValue);
+    if (entry.valueMode === "halfDaily") return calculateHalfDaily(config, entry.manualValue);
     return { ...L.calculateJourney({ ...entry, ...config, manualValue: entry.manualValue, valueMode: entry.valueMode || "worked" }), ...config };
   }
 
@@ -1221,6 +1235,7 @@
   function updatePreview() {
     const employee = getEmployee(dom.employeeSelect.value);
     const isFullDaily = dom.recordType.value === "fullDaily";
+    const isHalfDaily = dom.recordType.value === "halfDaily";
     const isDay21Balance = dom.recordType.value !== "absence" && dom.valueMode.value === "balance8h" && /-21$/.test(dom.workDate.value);
     dom.balanceCarryNotice.hidden = !isDay21Balance;
     if (dom.recordType.value === "absence") {
@@ -1246,17 +1261,21 @@
       dom.previewFinal.classList.remove("negative-text");
       return;
     }
-    dom.previewHours.textContent = isFullDaily
-      ? "1 diária completa"
-      : dom.valueMode.value === "balance8h"
+    dom.previewHours.textContent = isHalfDaily
+      ? "½ diária (4h)"
+      : isFullDaily
+        ? "1 diária completa"
+        : dom.valueMode.value === "balance8h"
         ? `Somente ${L.formatSignedDuration(result.balanceMinutes)}`
         : L.formatDuration(result.workedMinutes);
     dom.previewCalculated.textContent = currency.format(result.calculatedValue);
     dom.previewFinal.textContent = currency.format(result.finalValue);
     dom.previewFinal.classList.toggle("negative-text", result.finalValue < 0);
-    dom.formulaNote.textContent = isFullDaily
-      ? `Diária integral de ${currency.format(result.dailyRate)}, sem necessidade de informar horários${result.manualValue !== null ? " • substituída pelo valor manual" : ""}.`
-      : dom.valueMode.value === "balance8h"
+    dom.formulaNote.textContent = isHalfDaily
+      ? `Meia diária: ${currency.format(result.dailyRate)} ÷ 2 = ${currency.format(result.calculatedValue)}, sem necessidade de informar horários${result.manualValue !== null ? " • substituída pelo valor manual" : ""}.`
+      : isFullDaily
+        ? `Diária integral de ${currency.format(result.dailyRate)}, sem necessidade de informar horários${result.manualValue !== null ? " • substituída pelo valor manual" : ""}.`
+        : dom.valueMode.value === "balance8h"
       ? `A diária integral já foi paga. ${L.formatDuration(result.workedMinutes)} − 8h = ${L.formatSignedDuration(result.balanceMinutes)}. Será lançado somente ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`
       : result.paymentType === "monthly"
         ? `${currency.format(result.monthlySalary)} ÷ ${result.monthlyHours}h × ${(result.workedMinutes / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}h = ${currency.format(result.calculatedValue)}${result.manualValue !== null ? " • substituído pelo valor manual" : ""}.`
@@ -1276,7 +1295,9 @@
     const isService = employeeCompanyKey(employee) === "service" && Boolean(employee);
     dom.fullDailyOption.hidden = !isService;
     dom.fullDailyOption.disabled = !isService;
-    if (!isService && dom.recordType.value === "fullDaily") dom.recordType.value = "work";
+    dom.halfDailyOption.hidden = !isService;
+    dom.halfDailyOption.disabled = !isService;
+    if (!isService && (dom.recordType.value === "fullDaily" || dom.recordType.value === "halfDaily")) dom.recordType.value = "work";
     if (isService && preferServiceDaily && !dom.entryId.value && dom.recordType.value === "work") {
       dom.recordType.value = "fullDaily";
     }
@@ -1285,9 +1306,12 @@
   function updateRecordTypeFields() {
     const isAbsence = dom.recordType.value === "absence";
     const isFullDaily = dom.recordType.value === "fullDaily";
-    const noTimes = isAbsence || isFullDaily;
+    const isHalfDaily = dom.recordType.value === "halfDaily";
+    const isDailyWithoutTimes = isFullDaily || isHalfDaily;
+    const noTimes = isAbsence || isDailyWithoutTimes;
     if (isFullDaily) dom.valueMode.value = "fullDaily";
-    else if (dom.valueMode.value === "fullDaily") dom.valueMode.value = "worked";
+    else if (isHalfDaily) dom.valueMode.value = "halfDaily";
+    else if (dom.valueMode.value === "fullDaily" || dom.valueMode.value === "halfDaily") dom.valueMode.value = "worked";
     dom.timeGrid.hidden = noTimes;
     dom.calculationMode.hidden = noTimes;
     dom.calcPreview.hidden = isAbsence;
@@ -1295,16 +1319,21 @@
     dom.adjustmentBox.hidden = isAbsence;
     dom.paymentStatusField.hidden = isAbsence;
     dom.absenceFormNotice.hidden = !isAbsence;
-    dom.fullDailyFormNotice.hidden = !isFullDaily;
+    dom.fullDailyFormNotice.hidden = !isDailyWithoutTimes;
+    if (isDailyWithoutTimes) {
+      dom.fullDailyFormNotice.innerHTML = isHalfDaily
+        ? "<strong>Meia diária</strong><span>Exclusivo da Nespoli Serviço: lança 50% da diária sem exigir horários e contabiliza 4 horas.</span>"
+        : "<strong>Diária completa</strong><span>Exclusivo da Nespoli Serviço: salva uma diária integral sem exigir entrada, intervalo ou saída.</span>";
+    }
     [dom.startTime, dom.breakStart, dom.breakEnd, dom.endTime].forEach((input) => { input.disabled = noTimes; });
     dom.valueMode.disabled = noTimes;
     [dom.manualValue, dom.manualReason, dom.paymentStatus].forEach((input) => { input.disabled = isAbsence; });
     dom.startTime.required = !noTimes;
     dom.endTime.required = !noTimes;
-    dom.entryFormTitle.textContent = isAbsence ? "Registrar falta" : isFullDaily ? "Registrar diária" : "Registrar jornada";
+    dom.entryFormTitle.textContent = isAbsence ? "Registrar falta" : isHalfDaily ? "Registrar meia diária" : isFullDaily ? "Registrar diária" : "Registrar jornada";
     dom.notesLabel.innerHTML = isAbsence ? "Motivo ou observação <span>(opcional)</span>" : "Observação <span>(opcional)</span>";
-    dom.notes.placeholder = isAbsence ? "Ex.: não compareceu e não justificou" : isFullDaily ? "Ex.: serviço executado no dia" : "Serviço, local ou lembrete";
-    if (!dom.entryId.value) dom.saveEntryBtn.textContent = isAbsence ? "Registrar falta" : isFullDaily ? "Salvar diária" : "Salvar jornada";
+    dom.notes.placeholder = isAbsence ? "Ex.: não compareceu e não justificou" : isHalfDaily ? "Ex.: trabalhou somente meio período" : isFullDaily ? "Ex.: serviço executado no dia" : "Serviço, local ou lembrete";
+    if (!dom.entryId.value) dom.saveEntryBtn.textContent = isAbsence ? "Registrar falta" : isHalfDaily ? "Salvar meia diária" : isFullDaily ? "Salvar diária" : "Salvar jornada";
     updatePaymentDateField();
     updatePreview();
   }
@@ -1452,7 +1481,7 @@
     dom.employeeSelect.value = entry.employeeId;
     updateRecordTypeAvailability(false);
     dom.workDate.value = entry.date;
-    dom.recordType.value = L.isAbsence(entry) ? "absence" : entry.valueMode === "fullDaily" ? "fullDaily" : "work";
+    dom.recordType.value = L.isAbsence(entry) ? "absence" : entry.valueMode === "halfDaily" ? "halfDaily" : entry.valueMode === "fullDaily" ? "fullDaily" : "work";
     dom.startTime.value = entry.start || "";
     dom.breakStart.value = entry.breakStart || "";
     dom.breakEnd.value = entry.breakEnd || "";
@@ -1465,7 +1494,7 @@
     dom.paymentDate.value = entry.paidDate || todayISO();
     updateRecordTypeFields();
     dom.adjustmentBox.open = entry.manualValue !== null && entry.manualValue !== undefined;
-    dom.formMode.textContent = L.isAbsence(entry) ? "EDITANDO FALTA" : entry.valueMode === "fullDaily" ? "EDITANDO DIÁRIA" : "EDITANDO JORNADA";
+    dom.formMode.textContent = L.isAbsence(entry) ? "EDITANDO FALTA" : entry.valueMode === "halfDaily" ? "EDITANDO MEIA DIÁRIA" : entry.valueMode === "fullDaily" ? "EDITANDO DIÁRIA" : "EDITANDO JORNADA";
     dom.saveEntryBtn.textContent = "Salvar alterações";
     dom.cancelEditBtn.hidden = false;
     updatePreview();
@@ -1674,9 +1703,11 @@
       </tr>`;
     }
     const isFullDaily = entry.valueMode === "fullDaily";
-    const journey = isFullDaily ? "Diária completa" : `${entry.start}–${entry.end}`;
-    const interval = isFullDaily ? "—" : entry.breakStart && entry.breakEnd ? `${entry.breakStart}–${entry.breakEnd}` : "Sem intervalo";
-    const hours = isFullDaily ? "1 diária (8h)" : entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes);
+    const isHalfDaily = entry.valueMode === "halfDaily";
+    const isDailyWithoutTimes = isFullDaily || isHalfDaily;
+    const journey = isHalfDaily ? "Meia diária" : isFullDaily ? "Diária completa" : `${entry.start}–${entry.end}`;
+    const interval = isDailyWithoutTimes ? "—" : entry.breakStart && entry.breakEnd ? `${entry.breakStart}–${entry.breakEnd}` : "Sem intervalo";
+    const hours = isHalfDaily ? "½ diária (4h)" : isFullDaily ? "1 diária (8h)" : entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes);
     const manual = calc.manualValue !== null ? `<span class="manual-tag" title="${escapeHTML(entry.manualReason)}">Manual: ${escapeHTML(entry.manualReason || "ajuste")}</span>` : "";
     const balance = entry.valueMode === "balance8h" ? `<span class="manual-tag">Saldo de 8h: ${L.formatSignedDuration(calc.balanceMinutes)}</span>` : "";
     return `<tr>
@@ -1838,8 +1869,8 @@
         const paymentLabel = entry.status === "paid"
           ? `Pago${entry.paidDate ? ` em ${dateBR(entry.paidDate)}` : ""}`
           : "Não pago";
-        const hoursText = entry.valueMode === "fullDaily" ? "1 diária completa (8h)" : entry.valueMode === "balance8h" ? `somente saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : L.formatDuration(calc.workedMinutes);
-        const journeyText = entry.valueMode === "fullDaily" ? "DIÁRIA COMPLETA" : `${entry.start}–${entry.end}`;
+        const hoursText = entry.valueMode === "halfDaily" ? "meia diária (4h)" : entry.valueMode === "fullDaily" ? "1 diária completa (8h)" : entry.valueMode === "balance8h" ? `somente saldo ${L.formatSignedDuration(calc.balanceMinutes)}` : L.formatDuration(calc.workedMinutes);
+        const journeyText = entry.valueMode === "halfDaily" ? "MEIA DIÁRIA" : entry.valueMode === "fullDaily" ? "DIÁRIA COMPLETA" : `${entry.start}–${entry.end}`;
         return `• ${dateBR(entry.date)} | ${journeyText} | ${hoursText} | ${paymentBaseLabel(calc)} | ${currency.format(calc.finalValue)} | ${paymentLabel}${balance}${adjustment}`;
       });
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
@@ -1891,9 +1922,11 @@
           ? `Pago${entry.paidDate ? `<div class="report-payment-date">em ${dateBR(entry.paidDate)}</div>` : ""}`
           : "Não pago";
         const isFullDaily = entry.valueMode === "fullDaily";
-        const journeyText = isFullDaily ? "Diária completa" : `${entry.start}–${entry.end}`;
-        const interval = isFullDaily ? "—" : entry.breakStart && entry.breakEnd ? `${entry.breakStart}–${entry.breakEnd}` : "Sem intervalo";
-        const hoursText = isFullDaily ? "1 diária (8h)" : entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes);
+        const isHalfDaily = entry.valueMode === "halfDaily";
+        const isDailyWithoutTimes = isFullDaily || isHalfDaily;
+        const journeyText = isHalfDaily ? "Meia diária" : isFullDaily ? "Diária completa" : `${entry.start}–${entry.end}`;
+        const interval = isDailyWithoutTimes ? "—" : entry.breakStart && entry.breakEnd ? `${entry.breakStart}–${entry.breakEnd}` : "Sem intervalo";
+        const hoursText = isHalfDaily ? "½ diária (4h)" : isFullDaily ? "1 diária (8h)" : entry.valueMode === "balance8h" ? `<strong>Saldo ${L.formatSignedDuration(calc.balanceMinutes)}</strong>` : L.formatDuration(calc.workedMinutes);
         return `<tr><td>${dateBR(entry.date)}</td><td>${journeyText}</td><td>${interval}</td><td>${hoursText}</td><td>${escapeHTML(paymentBaseLabel(calc))}<div class="report-adjustment">${currency.format(calc.hourlyRate)}/h</div></td><td>${currency.format(calc.finalValue)}${balance}${adjustment}</td><td>${paymentLabel}</td></tr>`;
       }).join("");
       const employeeAdvancesTotal = employeeAdvances.reduce((sum, advance) => sum + Number(advance.value), 0);
@@ -1980,7 +2013,7 @@
         return;
       }
       const calc = calculateEntry(entry);
-      lines.push([entry.valueMode === "fullDaily" ? "DIÁRIA COMPLETA" : entry.valueMode === "balance8h" ? "SALDO DE HORAS" : "JORNADA", displayEmployeeName(entry.employeeId, entry), companyName, dateBR(entry.date), entry.start, entry.breakStart || "", entry.breakEnd || "", entry.end, L.formatDuration(calc.workedMinutes), entry.valueMode === "balance8h" ? L.formatSignedDuration(calc.balanceMinutes) : "", calc.paymentType === "monthly" ? "Mensalista" : "Diária", calc.paymentType === "monthly" ? calc.monthlySalary.toFixed(2) : calc.dailyRate.toFixed(2), calc.hourlyRate.toFixed(2), calc.calculatedValue.toFixed(2), calc.finalValue.toFixed(2), calc.adjustment.toFixed(2), entry.manualReason || "", entry.status === "paid" ? "Pago" : "Não pago", entry.paidDate ? dateBR(entry.paidDate) : "", entry.notes || ""]);
+      lines.push([entry.valueMode === "halfDaily" ? "MEIA DIÁRIA" : entry.valueMode === "fullDaily" ? "DIÁRIA COMPLETA" : entry.valueMode === "balance8h" ? "SALDO DE HORAS" : "JORNADA", displayEmployeeName(entry.employeeId, entry), companyName, dateBR(entry.date), entry.start, entry.breakStart || "", entry.breakEnd || "", entry.end, L.formatDuration(calc.workedMinutes), entry.valueMode === "balance8h" ? L.formatSignedDuration(calc.balanceMinutes) : "", calc.paymentType === "monthly" ? "Mensalista" : "Diária", calc.paymentType === "monthly" ? calc.monthlySalary.toFixed(2) : calc.dailyRate.toFixed(2), calc.hourlyRate.toFixed(2), calc.calculatedValue.toFixed(2), calc.finalValue.toFixed(2), calc.adjustment.toFixed(2), entry.manualReason || "", entry.status === "paid" ? "Pago" : "Não pago", entry.paidDate ? dateBR(entry.paidDate) : "", entry.notes || ""]);
     });
     advances.forEach((advance) => {
       const employee = getEmployee(advance.employeeId);
@@ -1992,7 +2025,7 @@
   }
 
     function backupPayload() {
-    return { app: "Nespoli — Ponto e Pagamentos", backupVersion: 13, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli — Ponto e Pagamentos", backupVersion: 14, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
