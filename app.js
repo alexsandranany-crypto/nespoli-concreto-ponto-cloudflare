@@ -16,7 +16,7 @@
   const dateBR = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  const defaultState = () => ({ version: 14, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
+  const defaultState = () => ({ version: 15, employees: [], entries: [], advances: [], updatedAt: new Date().toISOString() });
   let state = loadState();
   let activePeriod = L.getCurrentCloseType(new Date());
   let activeRateEmployeeId = null;
@@ -178,7 +178,7 @@
     const aliceEmployeeIds = new Set((Array.isArray(data.employees) ? data.employees : [])
       .filter((employee) => employee.paySchedule === "monthlyFifthWeekday" || textValue(employee.name).toLocaleLowerCase("pt-BR").startsWith("alice"))
       .map((employee) => employee.id));
-    data.version = 14;
+    data.version = 15;
     data.advances = (Array.isArray(data.advances) ? data.advances : []).map((advance) => {
       const hadStatus = advance.status === "paid" || advance.status === "pending";
       const belongsToPaidSeptemberPeriod = String(advance.date || "") >= "2026-09-04" && String(advance.date || "") <= "2026-09-21";
@@ -319,7 +319,7 @@
           await pushCloudState();
           return;
         }
-        if (cloudSourceVersion < 14 && hasBusinessData(state)) {
+        if (cloudSourceVersion < 15 && hasBusinessData(state)) {
           state.updatedAt = new Date().toISOString();
           persistLocalState();
           await pushCloudState();
@@ -1849,7 +1849,7 @@
   }
 
   function buildWhatsappText(entries, advances) {
-    if (!entries.length && !advances.length) return `*NESPOLI — CONTROLES DE ACESSO E PAGAMENTOS*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
+    if (!entries.length && !advances.length) return `*NESPOLI BI — CONTROLES DE ACESSO E PAGAMENTOS*\nControles de acesso e pagamentos\nPeríodo: ${reportPeriodText()}\n\nNenhum lançamento encontrado.`;
     const outstandingItems = entries.filter((entry) => !L.isAbsence(entry)).map((entry) => {
       const calc = calculateEntry(entry);
       return { employeeId: entry.employeeId, status: entry.status, paidDate: entry.paidDate, finalValue: calc.valid ? calc.finalValue : 0 };
@@ -1891,7 +1891,7 @@
       return `*${name}*${companyLine}${pixLine}${scheduleLine}\n${[...lines, ...advanceLines].join("\n")}\nHoras para pagamento: ${formatPaymentMinutes(minutes)}\nFaltas: ${absenceCount}\nBruto: ${currency.format(subtotal)}\nVales: − ${currency.format(employeeAdvancesTotal)}\n*Líquido: ${currency.format(subtotal - employeeAdvancesTotal)}*${paidLine}`;
     });
     const paidDateLine = paidSummary.latestPaidDate ? ` • ${paidSummary.paymentDates.length > 1 ? "último pagamento" : "pago"} em ${dateBR(paidSummary.latestPaidDate)}` : "";
-    return `*NESPOLI — CONTROLES DE ACESSO E PAGAMENTOS*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
+    return `*NESPOLI BI — CONTROLES DE ACESSO E PAGAMENTOS*\n*Controles de acesso e pagamentos*\nPeríodo: ${reportPeriodText()}\n\n${sections.join("\n\n")}\n\nTotal bruto: ${currency.format(grossTotal)}\nVales: − ${currency.format(advancesTotal)}\n*TOTAL LÍQUIDO: ${currency.format(grossTotal - advancesTotal)}*\n*TOTAL PAGO LÍQUIDO: ${currency.format(paidSummary.paidNet)}*${paidDateLine}\nSaldo não pago após vales: ${currency.format(outstanding.pendingNet)}\n\nMensagem preparada pelo sistema. Confira antes de enviar.`;
   }
 
   function buildPrintableReport(entries, advances) {
@@ -1946,9 +1946,7 @@
       const employee = getEmployee(employeeId);
       const companyKey = employeeCompanyKey(employee);
       const companyName = employeeCompanyName(employee);
-      const companyLogo = companyKey === "service"
-        ? '<div class="payslip-logo payslip-logo-service" aria-label="Nespoli Serviço"><span>NS</span></div>'
-        : '<div class="payslip-logo"><img src="logo-nespoli-concreto.png" alt="Nespoli Concreto"></div>';
+      const companyLogo = '<div class="payslip-logo"><img src="logo-nespoli-bi.svg" alt="Nespoli BI"></div>';
       const pixKey = normalizeEmployeeProfile(employee).bank.pixKey;
       const schedule = paymentScheduleLabel(employee, items);
       const statusLabel = workItems.length
@@ -2020,12 +2018,12 @@
       lines.push(["VALE", displayEmployeeName(advance.employeeId, advance), employeeCompanyName(employee), dateBR(advance.date), "", "", "", "", "", "", "", "", "", "", (-Number(advance.value)).toFixed(2), "", "", advance.status === "paid" ? "Pago/descontado" : "Não pago", advance.paidDate ? dateBR(advance.paidDate) : "", advance.note || "Vale/adiantamento"]);
     });
     const csv = "\uFEFF" + lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n");
-    downloadBlob(csv, `relatorio-nespoli-${todayISO()}.csv`, "text/csv;charset=utf-8");
+    downloadBlob(csv, `relatorio-nespoli-bi-${todayISO()}.csv`, "text/csv;charset=utf-8");
     toast("Planilha CSV baixada.");
   }
 
     function backupPayload() {
-    return { app: "Nespoli — Ponto e Pagamentos", backupVersion: 14, exportedAt: new Date().toISOString(), data: state };
+    return { app: "Nespoli BI — Gestão de Ponto e Pagamentos", backupVersion: 15, exportedAt: new Date().toISOString(), data: state };
   }
 
   function exportBackup() {
