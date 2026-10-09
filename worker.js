@@ -22,7 +22,7 @@ function html(body, status = 200, extraHeaders = {}) {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
       "X-Robots-Tag": "noindex, nofollow",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       ...extraHeaders
     }
   });
@@ -30,9 +30,9 @@ function html(body, status = 200, extraHeaders = {}) {
 
 function loginPage(message = "") {
   const warning = message ? `<p class="error" role="alert">${message}</p>` : "";
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso privado • Nespoli Concreto</title><style>
-  :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#102038;background:#eef1f5}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at top,#fff7c7 0,#eef1f5 36%)}main{width:min(430px,100%);padding:30px;border:1px solid #d8dee8;border-radius:20px;background:#fff;box-shadow:0 20px 60px rgba(16,32,56,.14)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:25px}.mark{display:grid;place-items:center;width:54px;height:54px;border-radius:14px;background:#151515;color:#ffd229;font-size:22px;font-weight:900}.eyebrow{margin:0;color:#936f00;font-size:12px;font-weight:900;letter-spacing:.13em}.brand strong{font-size:20px}h1{margin:0 0 8px;font-size:28px}p{margin:0 0 20px;color:#667185;line-height:1.5}label{display:block;margin-bottom:7px;font-weight:800}input{width:100%;min-height:50px;padding:10px 13px;border:1px solid #bfc9d8;border-radius:10px;font:inherit}input:focus{outline:3px solid rgba(255,210,41,.35);border-color:#c99f00}button{width:100%;min-height:50px;margin-top:14px;border:0;border-radius:10px;background:#ffd229;color:#161616;font:inherit;font-weight:900;cursor:pointer}.error{margin:0 0 16px;padding:11px 13px;border-radius:9px;background:#fff0ec;color:#a33a18;font-weight:700}.privacy{margin:18px 0 0;font-size:12px;text-align:center}
-  </style></head><body><main><div class="brand"><div class="mark">NC</div><div><p class="eyebrow">NESPOLI CONCRETO</p><strong>Ponto e pagamentos</strong></div></div><h1>Acesso privado</h1><p>Digite a senha definida na implantação da Cloudflare.</p>${warning}<form method="post" action="/login"><label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus><button type="submit">Entrar</button></form><p class="privacy">Dados protegidos e não indexados por buscadores.</p></main></body></html>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso privado • Nespoli BI</title><style>
+  :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#102038;background:#eef1f5}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at top,#e8f1fb 0,#eef1f5 38%)}main{width:min(430px,100%);padding:30px;border:1px solid #d8dee8;border-radius:20px;background:#fff;box-shadow:0 20px 60px rgba(16,32,56,.14)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:25px}.mark{display:grid;place-items:center;width:112px;height:62px;padding:5px;border:1px solid #d8dee8;border-radius:12px;background:#fff;box-shadow:0 5px 18px rgba(7,54,107,.12)}.mark img{width:100%;height:100%;object-fit:contain}.eyebrow{margin:0;color:#07366b;font-size:12px;font-weight:900;letter-spacing:.13em}.brand strong{font-size:17px}h1{margin:0 0 8px;font-size:28px}p{margin:0 0 20px;color:#667185;line-height:1.5}label{display:block;margin-bottom:7px;font-weight:800}input{width:100%;min-height:50px;padding:10px 13px;border:1px solid #bfc9d8;border-radius:10px;font:inherit}input:focus{outline:3px solid rgba(255,210,41,.35);border-color:#c99f00}button{width:100%;min-height:50px;margin-top:14px;border:0;border-radius:10px;background:#ffd229;color:#161616;font:inherit;font-weight:900;cursor:pointer}.error{margin:0 0 16px;padding:11px 13px;border-radius:9px;background:#fff0ec;color:#a33a18;font-weight:700}.privacy{margin:18px 0 0;font-size:12px;text-align:center}
+  </style></head><body><main><div class="brand"><div class="mark"><img src="/logo-nespoli-bi.svg" alt="Nespoli BI"></div><div><p class="eyebrow">NESPOLI BI</p><strong>Gestão de ponto e pagamentos</strong></div></div><h1>Acesso privado</h1><p>Digite a senha definida na implantação da Cloudflare.</p>${warning}<form method="post" action="/login"><label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus><button type="submit">Entrar</button></form><p class="privacy">Dados protegidos e não indexados por buscadores.</p></main></body></html>`;
 }
 
 function secureEqual(left, right) {
@@ -176,6 +176,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/login") return handleLogin(request, env);
+    if (url.pathname === "/logo-nespoli-bi.svg" && (request.method === "GET" || request.method === "HEAD")) return serveStatic(request, url.pathname);
     if (url.pathname === "/logout" && request.method === "POST") {
       return new Response(null, { status: 303, headers: { Location: "/login", "Set-Cookie": "nespoli_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict", "Cache-Control": "no-store" } });
     }
