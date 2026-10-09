@@ -7,13 +7,15 @@ const files = [
   ["/styles.css", "styles.css"],
   ["/logic.js", "logic.js"],
   ["/app.js", "app.js"],
-  ["/logo-nespoli-concreto.png", "logo-nespoli-concreto.png"]
+  ["/logo-nespoli-concreto.png", "logo-nespoli-concreto.png"],
+  ["/logo-nespoli-bi.svg", "logo-nespoli-bi.svg"]
 ];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
-  ".png": "image/png"
+  ".png": "image/png",
+  ".svg": "image/svg+xml; charset=utf-8"
 };
 
 const staticFiles = {};
